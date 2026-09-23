@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { afterEach, test } from "node:test";
 
-import { attachFile, CAPTURE_FILES, loadScripts, makePage, until } from "./helpers.js";
+import { attachFile, CAPTURE_FILES, installDataTransfer, loadScripts, makePage, until } from "./helpers.js";
 
 const FAST = { quietMs: 20, maxSettleMs: 300, urlPollMs: 25, answerDebounceMs: 20 };
 const HOOK = readFileSync(new URL("../lib/main-world-hook.js", import.meta.url), "utf8");
@@ -29,6 +29,7 @@ function start(html, { url, capturing = true, applied = null, hook = false } = {
       },
     },
   };
+  installDataTransfer(dom.window);
   if (hook) {
     // jsdom leaves event.source null for self-posted messages; Chrome sets it
     // to the window, and content.js checks for that. Mimic Chrome.
@@ -204,4 +205,84 @@ test("re-injection is a no-op while alive, but replaces an orphaned copy", async
   assert.equal(t.window.AppLogger.contentAlive(), false);
   loadScripts(t.window, ["content.js"]);
   await until(() => t.of("page").length > before, "fresh copy captures the page");
+});
+
+// ---------------------------------------------------------------- copy numbers in upload names
+
+// Picks a file and waits until the upload is cached (so nothing runs after the test).
+async function pick(t, id, name) {
+  const input = t.doc.getElementById(id);
+  const before = t.of("upload").length;
+  attachFile(t.window, input, name, "%PDF bytes");
+  input.dispatchEvent(new t.window.Event("input", { bubbles: true }));
+  input.dispatchEvent(new t.window.Event("change", { bubbles: true }));
+  await until(() => t.of("upload").length > before, "upload cached");
+  return input;
+}
+
+test("on a job site, 'Resume(75).pdf' reaches the site as 'Resume.pdf'", async () => {
+  const t = start(POSTING, { url: "https://jobs.lever.co/acme/1/apply" });
+  // What the site's own handler sees (it runs after the content script's capture listener).
+  let seenBySite = null;
+  t.doc.getElementById("cv").addEventListener("change", (e) => (seenBySite = e.target.files[0].name));
+  const input = await pick(t, "cv", "Ada_Lovelace_Resume(75).pdf");
+  assert.equal(input.files[0].name, "Ada_Lovelace_Resume.pdf");
+  assert.equal(seenBySite, "Ada_Lovelace_Resume.pdf");
+  assert.equal(input.files[0].type, "application/pdf");
+  assert.equal(input.files[0].lastModified, 1700000000000);
+  await until(() => t.of("upload").length, "upload");
+  const cached = t.of("upload")[0].files[0];
+  assert.equal(cached.filename, "Ada_Lovelace_Resume.pdf");
+  assert.equal(Buffer.from(cached.base64, "base64").toString(), "%PDF bytes", "same bytes, new name");
+});
+
+test("a copy-numbered file in a field labelled Resume is renamed too", async () => {
+  const t = start(POSTING, { url: "https://jobs.lever.co/acme/1/apply" });
+  assert.equal((await pick(t, "cv", "Ada (3).pdf")).files[0].name, "Ada.pdf");
+});
+
+test("non-resume files and names without copy numbers are left alone", async () => {
+  const t = start(
+    `<body><label for="p">Profile photo</label><input type="file" id="p">
+     <label for="cv">Resume</label><input type="file" id="cv"></body>`,
+    { url: "https://jobs.lever.co/acme/1/apply" },
+  );
+  assert.equal((await pick(t, "p", "photo (2).png")).files[0].name, "photo (2).png");
+  assert.equal((await pick(t, "cv", "Ada_Lovelace_Resume_Quant.pdf")).files[0].name, "Ada_Lovelace_Resume_Quant.pdf");
+});
+
+test("not renamed on sites that aren't job pages", async () => {
+  const t = start(`<body><label for="cv">Resume</label><input type="file" id="cv"></body>`, {
+    url: "https://drive.example.com/upload",
+    capturing: false,
+  });
+  await until(() => t.of("check").length, "evaluated");
+  assert.equal((await pick(t, "cv", "Ada_Lovelace_Resume(75).pdf")).files[0].name, "Ada_Lovelace_Resume(75).pdf");
+  assert.equal(t.doc.documentElement.hasAttribute("data-app-logger-job-page"), false);
+});
+
+test("a custom-domain page becomes a job page once the session says so", async () => {
+  const t = start(`<body><label for="cv">Resume</label><input type="file" id="cv"></body>`, {
+    url: "https://careers.acme.com/apply/2",
+    capturing: true,
+  });
+  await until(() => t.doc.documentElement.getAttribute("data-app-logger-job-page") === "1", "flag");
+  assert.equal((await pick(t, "cv", "Resume (2).pdf")).files[0].name, "Resume.pdf");
+});
+
+test("detached inputs on job pages are renamed by the page-world hook", async () => {
+  const t = start(`<body></body>`, { url: "https://jobs.lever.co/acme/1/apply", hook: true });
+  const input = t.doc.createElement("input");
+  input.type = "file";
+  input.setAttribute("aria-label", "Resume");
+  // The site's own handler, registered before the picker opens.
+  let seenBySite = null;
+  input.addEventListener("change", () => (seenBySite = input.files[0].name));
+  input.click();
+  attachFile(t.window, input, "Ada_Lovelace_Resume(75).pdf", "d");
+  input.dispatchEvent(new t.window.Event("input"));
+  input.dispatchEvent(new t.window.Event("change"));
+  assert.equal(seenBySite, "Ada_Lovelace_Resume.pdf");
+  await until(() => t.of("upload").length, "upload");
+  assert.equal(t.of("upload")[0].files[0].filename, "Ada_Lovelace_Resume.pdf");
 });

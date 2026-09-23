@@ -84,6 +84,25 @@ def test_sanitize_filename_keeps_extension_when_truncating():
     assert len(name) == storage.MAX_FILENAME and name.endswith(".pdf")
 
 
+@pytest.mark.parametrize("raw, expected", [
+    ("Ada_Lovelace_Resume(75).pdf", "Ada_Lovelace_Resume.pdf"),
+    ("Ada_Lovelace_Resume (2).pdf", "Ada_Lovelace_Resume.pdf"),
+    ("Resume copy.docx", "Resume.docx"),
+    ("Resume copy 3.docx", "Resume.docx"),
+    ("Resume (2) copy.pdf", "Resume.pdf"),
+    ("Cover_Letter(1)(2).pdf", "Cover_Letter.pdf"),
+    ("Ada_Lovelace_Resume.pdf", "Ada_Lovelace_Resume.pdf"),
+    ("Ada_Lovelace_Resume_Quant.pdf", "Ada_Lovelace_Resume_Quant.pdf"),
+    ("Resume 2026.pdf", "Resume 2026.pdf"),
+    ("Resume-1.pdf", "Resume-1.pdf"),
+    ("Copywriter Resume.pdf", "Copywriter Resume.pdf"),
+    ("(75).pdf", "(75).pdf"),
+    ("Resume(3)", "Resume"),
+])
+def test_strip_copy_suffix(raw, expected):
+    assert storage.strip_copy_suffix(raw) == expected
+
+
 def test_create_unique_folder_collision_sequence(tmp_path):
     names = [storage.create_unique_folder(tmp_path, "google_swe", NOW).name for _ in range(4)]
     assert names == [

@@ -69,6 +69,7 @@
     const matched = signals.ats || signals.jsonld || signals.keywords;
     const res = await send({ type: "shouldCapture", matched });
     state.capturing = Boolean(res && res.capturing);
+    publishJobPage();
 
     if (state.capturing) {
       const snap = await AL.capture.snapshot({ files: false });
@@ -90,6 +91,54 @@
       scheduleEvaluate();
     }
   }, cfg.urlPollMs);
+
+  // ---------------------------------------------------------------- clean upload names
+  //
+  // On job pages, a resume/cover letter picked as "Resume(75).pdf" reaches the
+  // site as "Resume.pdf". The file on disk is untouched: this swaps the File in
+  // the input for a renamed copy (no re-read) during the "input" event, which
+  // fires before "change" and before the site's own handlers read the file.
+
+  const onJobPage = () => state.capturing || AL.isAtsPage(location.hostname, location.pathname);
+
+  // Tell lib/main-world-hook.js (page world) so it can do the same for detached inputs.
+  function publishJobPage() {
+    if (onJobPage()) document.documentElement.setAttribute("data-app-logger-job-page", "1");
+    else document.documentElement.removeAttribute("data-app-logger-job-page");
+  }
+
+  function cleanUploadNames(input) {
+    if (!onJobPage() || !input.files || !input.files.length || typeof DataTransfer === "undefined") return;
+    const label = AL.capture.fileFieldLabel(input);
+    const dt = new DataTransfer();
+    let changed = false;
+    for (const f of input.files) {
+      const clean = AL.capture.cleanFilename(f.name);
+      if (clean !== f.name && AL.capture.isResumeOrCover(f.name, label)) {
+        dt.items.add(new File([f], clean, { type: f.type, lastModified: f.lastModified }));
+        changed = true;
+      } else {
+        dt.items.add(f);
+      }
+    }
+    if (!changed) return;
+    try {
+      input.files = dt.files;
+    } catch (e) {
+      // Some exotic inputs refuse; the saved copy is still cleaned by the server.
+    }
+  }
+
+  for (const type of ["input", "change"]) {
+    document.addEventListener(
+      type,
+      (e) => {
+        const t = firstTarget(e);
+        if (t && t.tagName === "INPUT" && t.type === "file") cleanUploadNames(t);
+      },
+      true,
+    );
+  }
 
   // ---------------------------------------------------------------- uploads
 
@@ -239,5 +288,6 @@
     state.toast = host;
   }
 
+  publishJobPage();
   scheduleEvaluate();
 })();

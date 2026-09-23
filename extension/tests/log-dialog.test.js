@@ -253,3 +253,25 @@ test("expired or saved capture shows a message instead of the form", async () =>
   assert.ok(d.$("form").hidden);
   assert.match(d.$("banner").textContent, /expired or was already saved/);
 });
+
+test("resume/cover letter names are shown and saved without copy numbers", async () => {
+  const s = await ensureSession(nextTab++, { strong: true }, NOW);
+  await putPage(s.id, { url: "https://jobs.lever.co/acme/1", title: "Acme - SWE", isTop: true }, NOW);
+  await putUploads(s.id, { fieldKey: "r", fieldLabel: "Resume" }, [file("Ada_Lovelace_Resume(75).pdf", "r")], NOW);
+  await putUploads(s.id, { fieldKey: "o" }, [file("transcript (3).pdf", "t")], NOW + 1);
+  let posted;
+  const d = await openDialog(s.id, okServer(async (init) => {
+    posted = init;
+    return { status: 201, body: { id: 9, folder_path: "/x" } };
+  }, { labels: ["resume", "other"] }));
+  await until(() => kinds(d).join() === "resume,other", "labels");
+  const names = d.all("#files li .grow");
+  assert.deepEqual(names.map((n) => n.textContent), ["Ada_Lovelace_Resume.pdf", "transcript (3).pdf"]);
+  assert.match(names[0].title, /Uploaded as Ada_Lovelace_Resume\(75\)\.pdf/);
+
+  submit(d);
+  await until(() => posted, "save");
+  const payload = JSON.parse(await posted.body.get("payload").text());
+  assert.deepEqual(payload.documents.map((x) => x.filename), ["Ada_Lovelace_Resume.pdf", "transcript (3).pdf"]);
+  assert.deepEqual(posted.body.getAll("files").map((f) => f.name), ["Ada_Lovelace_Resume.pdf", "transcript (3).pdf"]);
+});

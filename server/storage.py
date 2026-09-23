@@ -55,6 +55,26 @@ def sanitize_filename(name: str) -> str:
     return name
 
 
+# Copy numbers browsers and macOS add to duplicates: "Resume(75)", "Resume (2)",
+# "Resume copy", "Resume copy 3". Deliberately not "-1" or " 2026": those can
+# be part of a real name.
+_COPY_SUFFIX = re.compile(r"(?:\s*\(\d+\)|\s+copy(?:\s+\d+)?)$", re.IGNORECASE)
+
+
+def strip_copy_suffix(filename: str) -> str:
+    """Strip copy numbers: "Ada_Lovelace_Resume(75).pdf" -> "Ada_Lovelace_Resume.pdf"."""
+    stem, dot, ext = filename.rpartition(".")
+    if not dot or not stem:
+        stem, dot, ext = filename, "", ""
+    cleaned = stem
+    while True:
+        shorter = _COPY_SUFFIX.sub("", cleaned).rstrip()
+        if shorter == cleaned:
+            break
+        cleaned = shorter
+    return f"{cleaned}{dot}{ext}" if cleaned else filename
+
+
 def folder_candidates(name: str, now: datetime):
     """`name`, then `name_YYYY-MM-DD`, then `name_YYYY-MM-DD_HHMM`, then numbered."""
     date = now.strftime("%Y-%m-%d")

@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
-import { attachFile, CAPTURE_FILES, loadScripts, makePage, plain } from "./helpers.js";
+import { attachFile, CAPTURE_FILES, COPY_CASES, loadScripts, makePage, plain } from "./helpers.js";
 
 function load(html, opts) {
   const dom = makePage(html, opts);
@@ -181,4 +181,15 @@ test("loading the scripts twice is harmless", () => {
   const { dom } = load("<body></body>");
   const AL = loadScripts(dom.window, CAPTURE_FILES);
   assert.equal(typeof AL.capture.snapshot, "function");
+});
+
+test("capture.cleanFilename matches the shared table; isResumeOrCover checks name or label", () => {
+  const { AL } = load("<body></body>");
+  for (const [raw, expected] of COPY_CASES) assert.equal(AL.capture.cleanFilename(raw), expected, raw);
+  assert.equal(AL.capture.isResumeOrCover("Ada_Resume(2).pdf", ""), true);
+  assert.equal(AL.capture.isResumeOrCover("Ada CV (2).pdf", ""), true);
+  assert.equal(AL.capture.isResumeOrCover("Cover Letter (2).pdf", ""), true);
+  assert.equal(AL.capture.isResumeOrCover("Ada (2).pdf", "Resume/CV"), true);
+  assert.equal(AL.capture.isResumeOrCover("photo (2).png", "Profile photo"), false);
+  assert.equal(AL.capture.isResumeOrCover("cvs-receipt (2).pdf", ""), false);
 });

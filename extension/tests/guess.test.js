@@ -1,7 +1,10 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
+import { COPY_CASES } from "./helpers.js";
+
 import {
+  cleanFilename,
   companyFromUrl,
   defaultKind,
   folderName,
@@ -141,4 +144,8 @@ test("guess for the Rippling flow: posting page title, company from the URL", ()
     folderName("Rippling", "Software Engineer Intern - Backend Focused - Summer 2027"),
     "rippling_swe_intern_backend_focused_summer_2027",
   );
+});
+
+test("cleanFilename strips browser/macOS copy numbers only", () => {
+  for (const [raw, expected] of COPY_CASES) assert.equal(cleanFilename(raw), expected, raw);
 });

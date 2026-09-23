@@ -350,14 +350,17 @@ def create_app(config: Config | None = None) -> FastAPI:
         )
 
         for doc, content in uploads:
+            filename = storage.sanitize_filename(doc.filename)
             file_path = None
             if doc.kind in WRITTEN_KINDS:
-                file_path = str(storage.write_file(folder, doc.filename, content))
+                # The copy on disk stays "Resume(75).pdf"; the saved one is "Resume.pdf".
+                filename = storage.strip_copy_suffix(filename)
+                file_path = str(storage.write_file(folder, filename, content))
             conn.execute(
                 "INSERT INTO documents (application_id, kind, filename, file_path, mime, sha256,"
                 " content, text_content) VALUES (?,?,?,?,?,?,?,?)",
                 (
-                    app_id, doc.kind, storage.sanitize_filename(doc.filename), file_path, doc.mime,
+                    app_id, doc.kind, filename, file_path, doc.mime,
                     hashlib.sha256(content).hexdigest(), content,
                     extract_text(content, doc.filename, doc.mime),
                 ),

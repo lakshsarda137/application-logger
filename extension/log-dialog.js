@@ -1,5 +1,5 @@
 import { api, ApiError, getConnection, ServerDownError } from "./lib/api.js";
-import { defaultKind, folderName, guessCompanyAndPosition } from "./lib/guess.js";
+import { cleanFilename, defaultKind, folderName, guessCompanyAndPosition } from "./lib/guess.js";
 import { buildLogData, fileKey } from "./lib/logdata.js";
 import { deleteSession, getSessionData, recentUploads } from "./lib/sessions.js";
 
@@ -160,12 +160,20 @@ function hostOf(url) {
   }
 }
 
+// Resume and cover letter are saved without copy numbers ("Resume(75).pdf" -> "Resume.pdf").
+const savedName = (file) => (file.kind === "other" ? file.filename : cleanFilename(file.filename));
+
 function renderFiles() {
   $("no-files").hidden = state.files.length > 0;
   $("files").replaceChildren(
     ...state.files.map((file, i) => {
-      const name = el("span", { className: "grow ellipsis", textContent: file.filename });
-      name.title = file.fieldLabel ? `${file.filename} (from “${file.fieldLabel}”)` : file.filename;
+      const name = el("span", { className: "grow ellipsis", textContent: savedName(file) });
+      name.title = [
+        savedName(file) !== file.filename ? `Uploaded as ${file.filename}` : "",
+        file.fieldLabel ? `From “${file.fieldLabel}”` : "",
+      ]
+        .filter(Boolean)
+        .join(" · ") || file.filename;
 
       const select = el("select");
       select.setAttribute("aria-label", `Label for ${file.filename}`);
@@ -173,6 +181,7 @@ function renderFiles() {
       select.addEventListener("change", () => {
         file.kind = select.value;
         file.userSet = true;
+        name.textContent = savedName(file);
       });
 
       const remove = el("button", { type: "button", className: "icon", textContent: "×" });
@@ -337,7 +346,7 @@ $("form").addEventListener("submit", async (e) => {
     pages: state.pages
       .filter((pg) => pg.include)
       .map((pg) => ({ url: pg.url, title: pg.title, text: pg.text, captured_at: pg.capturedAt })),
-    documents: state.files.map((f) => ({ kind: f.kind, filename: f.filename, mime: f.mime || null })),
+    documents: state.files.map((f) => ({ kind: f.kind, filename: savedName(f), mime: f.mime || null })),
     form_answers: state.answers.map((a) => ({
       page_url: a.page_url,
       field_label: a.field_label,
@@ -348,7 +357,7 @@ $("form").addEventListener("submit", async (e) => {
 
   const body = new FormData();
   body.append("payload", new Blob([JSON.stringify(payload)], { type: "application/json" }), "payload.json");
-  for (const f of state.files) body.append("files", f.blob, f.filename);
+  for (const f of state.files) body.append("files", f.blob, savedName(f));
 
   state.saving = true;
   $("save").disabled = true;

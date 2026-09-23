@@ -298,3 +298,21 @@ def test_list_and_detail(client, month_dir):
     assert len(detail["form_answers"]) == 1
 
     assert client.get("/applications/9999").status_code == 404
+
+
+def test_copy_numbers_are_stripped_from_saved_resume_and_cover_letter(client, config, month_dir):
+    payload = full_payload(documents=[
+        {"kind": "resume", "filename": "Ada_Lovelace_Resume(75).pdf", "mime": "application/pdf"},
+        {"kind": "cover_letter", "filename": "Ada_Lovelace_Cover_Letter (2).pdf", "mime": "application/pdf"},
+        {"kind": "other", "filename": "transcript (3).pdf", "mime": "application/pdf"},
+    ])
+    r = client.post("/applications", files=multipart(payload, [
+        ("Ada_Lovelace_Resume(75).pdf", RESUME, "application/pdf"),
+        ("Ada_Lovelace_Cover_Letter (2).pdf", COVER, "application/pdf"),
+        ("transcript (3).pdf", b"t", "application/pdf"),
+    ]))
+    assert r.status_code == 201, r.text
+    folder = Path(r.json()["folder_path"])
+    assert sorted(p.name for p in folder.iterdir()) == ["Ada_Lovelace_Cover_Letter.pdf", "Ada_Lovelace_Resume.pdf"]
+    names = [d["filename"] for d in query(config, "SELECT filename FROM documents ORDER BY id")]
+    assert names == ["Ada_Lovelace_Resume.pdf", "Ada_Lovelace_Cover_Letter.pdf", "transcript (3).pdf"]

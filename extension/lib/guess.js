@@ -188,3 +188,19 @@ export function defaultKind(filename, fieldLabel = "", taken = []) {
   if (!taken.includes("cover_letter")) return "cover_letter";
   return "other";
 }
+
+// Copy numbers browsers and macOS add to duplicates. Same rule as
+// lib/capture.js and server/storage.py strip_copy_suffix.
+const COPY_SUFFIX = /(?:\s*\(\d+\)|\s+copy(?:\s+\d+)?)$/i;
+
+/** "Resume(75).pdf" -> "Resume.pdf"; "Resume copy 2.pdf" -> "Resume.pdf". */
+export function cleanFilename(name) {
+  const dot = name.lastIndexOf(".");
+  const ext = dot > 0 ? name.slice(dot) : "";
+  let stem = dot > 0 ? name.slice(0, dot) : name;
+  for (let prev = null; prev !== stem; ) {
+    prev = stem;
+    stem = stem.replace(COPY_SUFFIX, "").trimEnd();
+  }
+  return stem ? stem + ext : name;
+}

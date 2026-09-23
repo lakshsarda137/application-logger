@@ -94,6 +94,26 @@
     );
   }
 
+  // Copy numbers browsers and macOS add to duplicates: "Resume(75)", "Resume (2)",
+  // "Resume copy 3". Not "-1" or " 2026", which can be part of a real name.
+  // Same rule as server/storage.py strip_copy_suffix and lib/guess.js.
+  const COPY_SUFFIX = /(?:\s*\(\d+\)|\s+copy(?:\s+\d+)?)$/i;
+  function cleanFilename(name) {
+    const dot = name.lastIndexOf(".");
+    const ext = dot > 0 ? name.slice(dot) : "";
+    let stem = dot > 0 ? name.slice(0, dot) : name;
+    for (let prev = null; prev !== stem; ) {
+      prev = stem;
+      stem = stem.replace(COPY_SUFFIX, "").trimEnd();
+    }
+    return stem ? stem + ext : name;
+  }
+
+  const RESUME_OR_COVER = /r[eé]sum[eé]|(^|[^a-z])cv([^a-z]|$)|cover/i;
+  function isResumeOrCover(filename, fieldLabel) {
+    return RESUME_OR_COVER.test(filename || "") || RESUME_OR_COVER.test(fieldLabel || "");
+  }
+
   function fieldId(el) {
     return el.name || el.id || el.getAttribute("data-automation-id") || "";
   }
@@ -285,6 +305,8 @@
 
   AL.capture = {
     answerFor,
+    cleanFilename,
+    isResumeOrCover,
     collectAnswers,
     dropTarget,
     fieldKey,
