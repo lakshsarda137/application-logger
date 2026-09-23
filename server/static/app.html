@@ -8,69 +8,85 @@
 </head>
 <body>
   <header class="topbar">
-    <a class="brand" href="/">Application Logger</a>
-    <nav>
-      <a href="/">Search</a>
-      <a href="/settings.html">Settings</a>
-    </nav>
+    <div class="topbar-inner">
+      <a class="brand" href="/"><span class="brand-mark">AL</span>Applications</a>
+      <form class="topbar-search" action="/" method="get" role="search">
+        <input type="search" name="q" data-search placeholder="Search…" aria-label="Search applications" autocomplete="off">
+      </form>
+      <a class="btn icon-only gear" href="/settings.html" data-icon="settings" aria-label="Settings" title="Settings"></a>
+    </div>
   </header>
+
   <main>
-    <p class="small"><a href="/" id="back">← All applications</a></p>
+    <a class="back" id="back" href="/" data-icon="back">Applications</a>
     <div id="messages"></div>
+
     <div id="content" hidden>
-      <div class="header-row">
-        <div>
-          <h1 id="title"></h1>
-          <p id="subtitle" class="muted"></p>
+      <section class="hero">
+        <span id="mono-slot"></span>
+        <div class="hero-text">
+          <h1 id="company"></h1>
+          <div class="position" id="position"></div>
         </div>
-        <div id="delete-area"></div>
+        <div class="hero-actions">
+          <a id="posting-link" class="btn outline" target="_blank" rel="noopener noreferrer" data-icon="external"
+             title="Open the original posting"><span class="label-text">Posting</span></a>
+          <button type="button" id="more" class="btn icon-only outline" data-icon="more"
+                  aria-label="More actions" title="More" aria-haspopup="menu" aria-expanded="false"></button>
+          <div id="menu" class="menu" role="menu" hidden>
+            <button type="button" role="menuitem" class="btn" id="copy-folder" data-icon="folder">Copy folder path</button>
+            <button type="button" role="menuitem" class="btn" id="copy-job" data-icon="copy">Copy job ID</button>
+            <hr>
+            <button type="button" role="menuitem" class="btn danger" id="delete-open" data-icon="trash">Delete…</button>
+          </div>
+        </div>
+      </section>
+
+      <div class="chips" id="chips"></div>
+      <div class="tiles" id="tiles"></div>
+
+      <div class="tabs" role="tablist" aria-label="Application sections">
+        <button type="button" class="tab" role="tab" id="tab-posting" aria-controls="panel-posting">Posting</button>
+        <button type="button" class="tab" role="tab" id="tab-answers" aria-controls="panel-answers">Answers<span class="count num" id="answers-count"></span></button>
+        <button type="button" class="tab" role="tab" id="tab-archived" aria-controls="panel-archived">Archived page</button>
+        <button type="button" class="tab" role="tab" id="tab-details" aria-controls="panel-details">Details</button>
       </div>
 
-      <section class="panel">
-        <h2>Details</h2>
-        <dl class="meta" id="meta"></dl>
+      <section class="panel" role="tabpanel" id="panel-posting" aria-labelledby="tab-posting">
+        <div class="clamp" id="posting-body"><p class="prose" id="posting-text"></p></div>
+        <button type="button" class="btn outline show-more" id="show-more" hidden>Show full posting</button>
       </section>
-
-      <section class="panel">
-        <h2>Resume and cover letter</h2>
-        <div id="documents"></div>
+      <section class="panel" role="tabpanel" id="panel-answers" aria-labelledby="tab-answers" hidden></section>
+      <section class="panel" role="tabpanel" id="panel-archived" aria-labelledby="tab-archived" hidden>
+        <p class="muted">The page as it looked when you logged it. Scripts are disabled.</p>
       </section>
-
-      <section class="panel">
-        <details open>
-          <summary>Posting text</summary>
-          <pre class="text" id="posting-text"></pre>
-        </details>
-      </section>
-
-      <section class="panel" id="snapshot-panel">
-        <details id="snapshot-details">
-          <summary>Archived page</summary>
-          <p class="muted small">The page as it looked when you logged it. Scripts are disabled.</p>
-          <div id="snapshot"></div>
-        </details>
-      </section>
-
-      <section class="panel">
-        <details open>
-          <summary id="answers-summary">Portal answers</summary>
-          <div id="answers"></div>
-        </details>
-      </section>
-
-      <section class="panel">
-        <details>
-          <summary id="pages-summary">Captured pages</summary>
-          <ul class="plain" id="pages"></ul>
-        </details>
-      </section>
-
-      <section class="panel" id="other-panel" hidden>
-        <h2>Other files</h2>
-        <div id="other-documents"></div>
-      </section>
+      <section class="panel" role="tabpanel" id="panel-details" aria-labelledby="tab-details" hidden></section>
     </div>
   </main>
+
+  <dialog id="preview" class="preview" aria-labelledby="preview-name">
+    <div class="preview-head">
+      <span class="name" id="preview-name"></span>
+      <a class="btn icon-only" id="preview-download" data-icon="download" aria-label="Download" title="Download"></a>
+      <a class="btn icon-only" id="preview-open" target="_blank" rel="noopener" data-icon="external"
+         aria-label="Open in a new tab" title="Open in a new tab"></a>
+      <button type="button" class="btn icon-only" id="preview-close" data-icon="close" aria-label="Close" title="Close (Esc)"></button>
+    </div>
+    <div id="preview-body"></div>
+  </dialog>
+
+  <dialog id="delete-dialog" aria-labelledby="delete-title">
+    <div class="dialog-body">
+      <h2 id="delete-title">Delete this application?</h2>
+      <p id="delete-what"></p>
+      <p>This removes the record and its folder on disk. It can't be undone.</p>
+    </div>
+    <div class="dialog-actions">
+      <button type="button" class="btn outline" id="delete-cancel" autofocus>Cancel</button>
+      <button type="button" class="btn danger solid" id="delete-confirm">Delete permanently</button>
+    </div>
+  </dialog>
+
   <script type="module" src="/static/app.js"></script>
 </body>
 </html>

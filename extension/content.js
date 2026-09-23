@@ -11,8 +11,17 @@
 
 (() => {
   const AL = globalThis.AppLogger;
-  if (!AL || !AL.capture || AL.contentLoaded) return;
-  AL.contentLoaded = true;
+  if (!AL || !AL.capture) return;
+  // Skip if a live copy is already running. After an extension reload the old
+  // copy is orphaned (chrome.runtime.id is gone), so a fresh one takes over.
+  if (AL.contentAlive && AL.contentAlive()) return;
+  AL.contentAlive = () => {
+    try {
+      return Boolean(chrome.runtime && chrome.runtime.id);
+    } catch (e) {
+      return false;
+    }
+  };
 
   const cfg = Object.assign({ quietMs: 800, maxSettleMs: 6000, urlPollMs: 1000, answerDebounceMs: 400 }, AL.config);
   const isTop = window.top === window.self;

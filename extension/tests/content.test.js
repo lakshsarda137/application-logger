@@ -20,6 +20,7 @@ function start(html, { url, capturing = true, applied = null, hook = false } = {
   const sent = [];
   dom.window.chrome = {
     runtime: {
+      id: "test-extension",
       sendMessage: async (msg) => {
         sent.push(JSON.parse(JSON.stringify(msg)));
         if (msg.type === "shouldCapture") return { capturing: msg.matched || capturing };
@@ -187,4 +188,20 @@ test("loading content.js twice doesn't double-register listeners", async () => {
   await until(() => t.of("upload").length, "upload");
   await new Promise((r) => setTimeout(r, 50));
   assert.equal(t.of("upload").length, 1);
+});
+
+test("re-injection is a no-op while alive, but replaces an orphaned copy", async () => {
+  const t = start(POSTING, { url: "https://careers.acme.com/jobs/9" });
+  await until(() => t.of("page").length, "page");
+  const before = t.of("page").length;
+
+  loadScripts(t.window, ["content.js"]);
+  await new Promise((r) => setTimeout(r, 150));
+  assert.equal(t.of("page").length, before, "live copy: second injection does nothing");
+
+  // Extension reloaded: the old copy's runtime loses its id.
+  t.window.chrome.runtime = { sendMessage: t.window.chrome.runtime.sendMessage };
+  assert.equal(t.window.AppLogger.contentAlive(), false);
+  loadScripts(t.window, ["content.js"]);
+  await until(() => t.of("page").length > before, "fresh copy captures the page");
 });

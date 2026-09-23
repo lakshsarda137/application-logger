@@ -101,3 +101,44 @@ test("defaultKind: filename, then field label, then fill resume/cover letter", (
   assert.equal(defaultKind("ada.pdf", "", ["resume"]), "cover_letter");
   assert.equal(defaultKind("ada.pdf", "", ["resume", "cover_letter"]), "other");
 });
+
+test("companyFromUrl: Rippling ATS", () => {
+  assert.equal(companyFromUrl("https://ats.rippling.com/rippling/jobs/a07e4e46/apply?_gl=x"), "Rippling");
+  assert.equal(companyFromUrl("https://ats.rippling.com/acme-robotics/jobs/1"), "Acme Robotics");
+});
+
+test("parseTitle drops page-noise segments and doesn't split 3+ part titles", () => {
+  assert.deepEqual(parseTitle("Apply for job post"), {});
+  assert.deepEqual(parseTitle("Apply - Software Engineer Intern - Backend Focused - Summer 2027"), {
+    position: "Software Engineer Intern - Backend Focused - Summer 2027",
+  });
+  assert.deepEqual(parseTitle("Software Engineer Intern - Backend Focused - Summer 2027"), {
+    position: "Software Engineer Intern - Backend Focused - Summer 2027",
+  });
+  assert.deepEqual(parseTitle("Backend Engineer - Payments - Stripe", { company: "Stripe" }), {
+    position: "Backend Engineer - Payments",
+    company: "Stripe",
+  });
+  assert.deepEqual(parseTitle("SWE Intern · Careers"), { position: "SWE Intern" });
+});
+
+test("guess for the Rippling flow: posting page title, company from the URL", () => {
+  const base = "https://ats.rippling.com/rippling/jobs/a07e4e46-3721-4934-b57b-0d58412e22ba";
+  const posting = { url: base, title: "Software Engineer Intern - Backend Focused - Summer 2027" };
+  const apply = { url: `${base}/apply?_gl=1`, title: "Apply for job post" };
+  assert.deepEqual(guessCompanyAndPosition(posting), {
+    company: "Rippling",
+    position: "Software Engineer Intern - Backend Focused - Summer 2027",
+  });
+  // Only the apply page was captured: company still from the URL, no junk position.
+  assert.deepEqual(guessCompanyAndPosition(apply), { company: "Rippling", position: "" });
+  // Apply page chosen as posting, but another page has a real title.
+  assert.deepEqual(guessCompanyAndPosition(apply, [posting]), {
+    company: "Rippling",
+    position: "Software Engineer Intern - Backend Focused - Summer 2027",
+  });
+  assert.equal(
+    folderName("Rippling", "Software Engineer Intern - Backend Focused - Summer 2027"),
+    "rippling_swe_intern_backend_focused_summer_2027",
+  );
+});

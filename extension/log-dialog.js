@@ -19,6 +19,7 @@ const state = {
   answers: [],
   recent: [],
   month: null, // { month, path, exists } from the server
+  noToken: false,
   useCustomDir: false,
   folderEdited: false,
   saving: false,
@@ -89,7 +90,7 @@ function renderSaveLocation() {
     $("save-path").textContent = m.exists ? m.path : `${m.path} (doesn't exist yet)`;
     $("month-name").textContent = m.month;
   } else {
-    $("save-path").textContent = "(server not reachable)";
+    $("save-path").textContent = state.noToken ? "(connect the extension first)" : "(server not reachable)";
   }
 }
 
@@ -127,7 +128,8 @@ $("folder-name").addEventListener("input", () => {
 
 function applyGuess() {
   const posting = state.pages[state.postingIndex];
-  const guess = guessCompanyAndPosition(posting || {});
+  const others = state.pages.filter((p) => p !== posting).reverse(); // newest first
+  const guess = guessCompanyAndPosition(posting || {}, others);
   $("company").value = guess.company;
   $("position").value = guess.position;
   updateFolderName();
@@ -392,6 +394,7 @@ $("close-done").addEventListener("click", () => window.close());
 async function connect() {
   hideBanner();
   const { apiToken } = await getConnection();
+  state.noToken = !apiToken;
   if (!apiToken) {
     showBanner("Paste the API token from config.local.json into the extension's settings first.", {
       action: { label: "Open settings", onClick: () => chrome.runtime.openOptionsPage() },

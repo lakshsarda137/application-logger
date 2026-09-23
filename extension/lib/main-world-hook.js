@@ -7,6 +7,9 @@
 // inputs and hand their files to the content script via postMessage.
 
 (() => {
+  // Injected again into open tabs when the extension reloads; wrap only once.
+  if (window.__appLoggerHooked) return;
+  Object.defineProperty(window, "__appLoggerHooked", { value: true });
   const TYPE = "app-logger:detached-files";
   const proto = HTMLInputElement.prototype;
   const watched = new WeakSet();

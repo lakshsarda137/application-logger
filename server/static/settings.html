@@ -8,44 +8,61 @@
 </head>
 <body>
   <header class="topbar">
-    <a class="brand" href="/">Application Logger</a>
-    <nav>
-      <a href="/">Search</a>
-      <a href="/settings.html" aria-current="page">Settings</a>
-    </nav>
+    <div class="topbar-inner">
+      <a class="brand" href="/"><span class="brand-mark">AL</span>Applications</a>
+      <form class="topbar-search" action="/" method="get" role="search">
+        <input type="search" name="q" data-search placeholder="Search…" aria-label="Search applications" autocomplete="off">
+      </form>
+      <a class="btn icon-only gear" href="/settings.html" data-icon="settings" aria-label="Settings" title="Settings" aria-current="page"></a>
+    </div>
   </header>
+
   <main>
-    <h1>Settings</h1>
+    <h1 class="page-title">Settings</h1>
     <div id="messages"></div>
 
-    <section class="panel">
-      <h2>Save location</h2>
-      <p class="muted small">Resumes and cover letters are saved to
-        <code>{base path}/{Month}/{folder}</code>. Changes you make in Finder aren't reflected here.</p>
-      <form id="base-form">
-        <label class="field">Base path
-          <input id="base-path" autocomplete="off" spellcheck="false" required>
-        </label>
-        <div class="row">
-          <button type="submit" class="primary">Save</button>
+    <div class="settings">
+      <section class="setting">
+        <div class="setting-row">
+          <div class="grow">
+            <div class="name">Save location</div>
+            <div class="value path" id="base-display">…</div>
+          </div>
+          <button type="button" class="btn outline" id="base-edit">Change</button>
         </div>
-      </form>
-    </section>
+        <form id="base-form" hidden>
+          <label class="visually-hidden" for="base-path">Base path</label>
+          <input id="base-path" autocomplete="off" spellcheck="false" required>
+          <p class="hint">Files go to <code>{this folder}/{Month}/{application}</code>. The folder must already exist.
+            Changes made in Finder aren't reflected here.</p>
+          <div class="form-actions">
+            <button type="submit" class="btn primary">Save</button>
+            <button type="button" class="btn" id="base-cancel">Cancel</button>
+          </div>
+        </form>
+      </section>
 
-    <section class="panel">
-      <h2>This month's folder</h2>
-      <p id="month-status"></p>
-      <div class="row">
-        <button type="button" id="create-month" hidden>Create it now</button>
-      </div>
-      <p class="muted small">When the month's folder is missing, the log dialog asks before creating it.</p>
-    </section>
+      <section class="setting">
+        <div class="setting-row">
+          <div class="grow">
+            <div class="name">This month</div>
+            <div class="value" id="month-display">…</div>
+          </div>
+          <span class="status" id="month-status" hidden></span>
+          <button type="button" class="btn outline" id="create-month" hidden>Create</button>
+        </div>
+      </section>
 
-    <section class="panel">
-      <h2>Extension</h2>
-      <p class="small">Paste the <code>api_token</code> from <code>config.local.json</code> into the extension's
-        options page (right-click the extension icon → Options).</p>
-    </section>
+      <section class="setting">
+        <details>
+          <summary>Connecting the extension</summary>
+          <p>Copy <code>api_token</code> from <code>config.local.json</code> in the project folder. In Chrome,
+            right-click the extension icon, choose <strong>Options</strong>, paste the token and click
+            <strong>Test connection</strong>.</p>
+          <p>Press <span class="kbd">/</span> on any page to search.</p>
+        </details>
+      </section>
+    </div>
   </main>
   <script type="module" src="/static/settings.js"></script>
 </body>

@@ -8,22 +8,28 @@
 </head>
 <body>
   <header class="topbar">
-    <a class="brand" href="/">Application Logger</a>
-    <nav>
-      <a href="/" aria-current="page">Search</a>
-      <a href="/settings.html">Settings</a>
-    </nav>
+    <div class="topbar-inner">
+      <a class="brand" href="/"><span class="brand-mark">AL</span>Applications</a>
+      <span class="spacer"></span>
+      <a class="btn icon-only gear" href="/settings.html" data-icon="settings" aria-label="Settings" title="Settings"></a>
+    </div>
   </header>
   <main>
-    <h1>Applications</h1>
-    <p id="count" class="muted small"></p>
-    <form class="search-row" id="search-form" role="search">
-      <input id="q" type="search" placeholder="Search company, role, posting, resume, answers…" aria-label="Search"
-             autocomplete="off" autofocus>
-      <button type="submit">Search</button>
+    <form id="search-form" class="search" role="search">
+      <span class="search-icon" data-icon="search"></span>
+      <label class="visually-hidden" for="q">Search applications</label>
+      <input id="q" type="search" data-search autocomplete="off" spellcheck="false"
+             placeholder="Search company, role, posting, resume, answers…">
+      <div class="search-meta">
+        <span id="count" class="num"></span>
+        <button type="button" id="clear" class="btn icon-only clear-btn" data-icon="close" data-icon-size="sm"
+                aria-label="Clear search" title="Clear (Esc)" hidden></button>
+        <span class="kbd" title="Press / to search">/</span>
+      </div>
+      <button type="submit" class="visually-hidden">Search</button>
     </form>
     <div id="messages"></div>
-    <ul id="results" class="results" aria-live="polite"></ul>
+    <div id="results" aria-live="polite"></div>
   </main>
   <script type="module" src="/static/index.js"></script>
 </body>

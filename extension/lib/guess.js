@@ -21,6 +21,7 @@ export function prettifySlug(slug) {
 // [hostname regex, path regex] -> company slug capture group.
 const URL_PATTERNS = [
   [/(^|\.)greenhouse\.io$/, /^\/(?:embed\/job_app\?for=)?([^/?#]+)\/jobs?\//],
+  [/^ats\.rippling\.com$/, /^\/([^/?#]+)\/jobs\//],
   [/^jobs\.lever\.co$/, /^\/([^/?#]+)/],
   [/^jobs\.ashbyhq\.com$/, /^\/([^/?#]+)/],
   [/^apply\.workable\.com$/, /^\/([^/?#]+)/],
@@ -68,59 +69,73 @@ const TITLE_PATTERNS = [
   },
   // "Software Engineer at Acme" / "Software Engineer @ Acme"
   (t) => {
-    const m = t.match(/^(.+?)\s+(?:at|@)\s+(.+?)(?:\s+[|–—-]\s+.*)?$/i);
+    const m = t.match(/^(.+?)\s+(?:at|@)\s+(.+?)(?:\s+[|–—·-]\s+.*)?$/i);
     return m && { position: m[1], company: m[2] };
   },
 ];
 
-const SITE_SUFFIX =
-  /\s*[|–—-]\s*(careers?|jobs?|job board|greenhouse|lever|workday|ashby|linkedin|indeed|smartrecruiters|workable)\b.*$/i;
+const SEPARATOR = /\s+[|–—·-]\s+/;
+// Title segments that are about the page, not the job ("Apply - SWE Intern", "SWE | Careers").
+const NOISE =
+  /^(apply( now)?|apply for (this )?job( post)?|job application|application( form)?|job post(ing)?|job details|careers?|jobs?|job board|open (positions|roles)|greenhouse|lever|workday|ashby|linkedin|indeed|smartrecruiters|workable|rippling)$/i;
 
-export function parseTitle(title, { host = "" } = {}) {
-  const t = text(title).replace(SITE_SUFFIX, "").trim();
-  if (!t) return {};
+/**
+ * Split a page title into position/company.
+ * `company`: a company already known (JSON-LD or URL); its segment is dropped
+ * and everything else is the position. Without one, only a two-part title
+ * ("Position - Company") is split; longer titles like
+ * "SWE Intern - Backend Focused - Summer 2027" are all position.
+ */
+export function parseTitle(title, { host = "", company = "" } = {}) {
+  const parts = text(title)
+    .split(SEPARATOR)
+    .map((p) => p.trim())
+    .filter((p) => p && !NOISE.test(p));
+  if (!parts.length) return {};
+
+  const joined = parts.join(" - ");
   for (const pattern of TITLE_PATTERNS) {
-    const r = pattern(t);
+    const r = pattern(joined);
     if (r) return { position: r.position.trim(), company: r.company.trim() };
   }
-  // Lever: "Acme - Software Engineer"
-  if (/lever\.co$/.test(host)) {
-    const m = t.match(/^(.+?)\s+[-–—]\s+(.+)$/);
-    if (m) return { company: m[1].trim(), position: m[2].trim() };
+
+  if (company) {
+    const rest = parts.filter((p) => p.toLowerCase() !== company.toLowerCase());
+    return rest.length < parts.length ? { position: rest.join(" - "), company } : { position: joined };
   }
-  // Generic "Position - Company" / "Position | Company"
-  const m = t.match(/^(.+?)\s+[|–—-]\s+(.+)$/);
-  if (m) return { position: m[1].trim(), company: m[2].trim() };
-  return { position: t };
+  if (parts.length === 2) {
+    // Lever titles are "Acme - Software Engineer".
+    if (/lever\.co$/.test(host)) return { company: parts[0], position: parts[1] };
+    return { position: parts[0], company: parts[1] };
+  }
+  return { position: joined };
 }
 
 /**
  * posting: { url, title, jsonld } -> { company, position }
- * Order per README: JSON-LD, then page title, then ATS URL patterns.
+ * Company: JSON-LD, then the ATS URL, then the title. Position: JSON-LD, then
+ * the title. `otherPages` (newest first) are tried when the posting's title
+ * says nothing useful (e.g. "Apply for job post").
  */
-export function guessCompanyAndPosition(posting = {}) {
+export function guessCompanyAndPosition(posting = {}, otherPages = []) {
   const jsonld = posting.jsonld || {};
-  let company = text(jsonld.hiringOrganization);
-  let position = text(jsonld.title);
+  const known = text(jsonld.hiringOrganization) || companyFromUrl(posting.url);
 
   let host = "";
   try {
     host = new URL(posting.url).hostname;
   } catch {}
 
-  const fromUrl = companyFromUrl(posting.url);
-  const fromTitle = parseTitle(posting.title, { host });
-
-  // A company slug in the URL is more reliable than splitting a title on "-".
-  company = company || fromUrl || fromTitle.company || "";
-  if (!position) {
-    position = fromTitle.position || "";
-    // If the title was "Acme - SWE" and we guessed wrong way round, fix it.
-    if (fromUrl && position.toLowerCase() === fromUrl.toLowerCase() && fromTitle.company) {
-      position = fromTitle.company;
-    }
+  let fromTitle = parseTitle(posting.title, { host, company: known });
+  for (const page of otherPages) {
+    if (fromTitle.position) break;
+    fromTitle = parseTitle(page.title, { host, company: known || companyFromUrl(page.url) });
   }
-  return { company, position };
+
+  return {
+    company: known || fromTitle.company || "",
+    position: text(jsonld.title) || fromTitle.position || "",
+  };
 }
 
 const ABBREVIATIONS = [

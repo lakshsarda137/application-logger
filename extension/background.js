@@ -34,7 +34,22 @@ chrome.runtime.onInstalled.addListener(() => {
   });
   chrome.alarms.create("prune", { periodInMinutes: 30 });
   prune();
+  injectIntoOpenTabs();
 });
+
+// Chrome only runs manifest content scripts on pages loaded *after* install or
+// reload, so tabs that were already open would capture nothing. Inject now.
+async function injectIntoOpenTabs() {
+  const tabs = await chrome.tabs.query({ url: ["http://*/*", "https://*/*"] });
+  for (const tab of tabs) {
+    if (/^https?:\/\/(127\.0\.0\.1|localhost)[:/]/.test(tab.url || "")) continue;
+    const target = { tabId: tab.id, allFrames: true };
+    chrome.scripting
+      .executeScript({ target, files: ["lib/main-world-hook.js"], world: "MAIN" })
+      .catch(() => {});
+    chrome.scripting.executeScript({ target, files: [...CAPTURE_FILES, "content.js"] }).catch(() => {});
+  }
+}
 
 chrome.runtime.onStartup.addListener(async () => {
   await clearAllTabLinks().catch((e) => console.warn("[app-logger] clear links failed", e));
