@@ -1,0 +1,234 @@
+// Content script, in every frame of every http(s) page (README §4).
+//
+// - Page snapshots: once the DOM settles (and after SPA URL changes), asks the
+//   service worker whether this page should be cached (rules 1–4) and, if so,
+//   sends a snapshot.
+// - Uploads: any file picked into an <input type=file>, dropped on the page,
+//   or picked through a detached input (see main-world-hook.js) is read and
+//   cached, on every site, so it can't be lost.
+// - Answers: field label + value on change/blur while the page is cached.
+// - "You applied here" toast in the top frame.
+
+(() => {
+  const AL = globalThis.AppLogger;
+  if (!AL || !AL.capture || AL.contentLoaded) return;
+  AL.contentLoaded = true;
+
+  const cfg = Object.assign({ quietMs: 800, maxSettleMs: 6000, urlPollMs: 1000, answerDebounceMs: 400 }, AL.config);
+  const isTop = window.top === window.self;
+  const state = { capturing: false, url: location.href, toast: null };
+
+  function send(message) {
+    try {
+      return Promise.resolve(chrome.runtime.sendMessage(message)).catch(() => null);
+    } catch (e) {
+      // The extension was reloaded; this old content script is orphaned.
+      return Promise.resolve(null);
+    }
+  }
+
+  const firstTarget = (e) => (e.composedPath ? e.composedPath()[0] : e.target);
+
+  // ---------------------------------------------------------------- pages
+
+  function settled() {
+    return new Promise((resolve) => {
+      let quiet;
+      const done = () => {
+        observer.disconnect();
+        clearTimeout(quiet);
+        clearTimeout(cap);
+        resolve();
+      };
+      const observer = new MutationObserver(() => {
+        clearTimeout(quiet);
+        quiet = setTimeout(done, cfg.quietMs);
+      });
+      observer.observe(document.documentElement, { childList: true, subtree: true, characterData: true });
+      quiet = setTimeout(done, cfg.quietMs);
+      const cap = setTimeout(done, cfg.maxSettleMs);
+    });
+  }
+
+  let evaluating = null;
+  async function evaluate() {
+    const url = location.href;
+    await settled();
+    if (url !== location.href) return; // navigated again; that evaluation will run
+
+    const signals = AL.capture.signals();
+    const matched = signals.ats || signals.jsonld || signals.keywords;
+    const res = await send({ type: "shouldCapture", matched });
+    state.capturing = Boolean(res && res.capturing);
+
+    if (state.capturing) {
+      const snap = await AL.capture.snapshot({ files: false });
+      await send({ type: "page", snapshot: snap, isPosting: signals.jsonld || signals.keywords });
+      if (snap.answers.length) await send({ type: "answers", answers: snap.answers });
+    }
+    if (isTop) checkApplied();
+  }
+
+  function scheduleEvaluate() {
+    evaluating = (evaluating || Promise.resolve()).then(evaluate, evaluate);
+  }
+
+  // SPAs (Workday) change the URL without a page load.
+  setInterval(() => {
+    if (location.href !== state.url) {
+      state.url = location.href;
+      removeToast();
+      scheduleEvaluate();
+    }
+  }, cfg.urlPollMs);
+
+  // ---------------------------------------------------------------- uploads
+
+  async function cacheFiles(fileList, { fieldKey, fieldLabel }) {
+    const files = await AL.capture.readFiles(fileList);
+    if (!files.length) return;
+    await send({ type: "upload", fieldKey, fieldLabel, pageUrl: location.href, files });
+  }
+
+  document.addEventListener(
+    "change",
+    (e) => {
+      const t = firstTarget(e);
+      if (t && t.tagName === "INPUT" && t.type === "file" && t.files && t.files.length) {
+        const fieldLabel = AL.capture.fileFieldLabel(t);
+        cacheFiles(t.files, { fieldKey: AL.capture.fieldKey(t, fieldLabel), fieldLabel });
+      }
+    },
+    true,
+  );
+
+  document.addEventListener(
+    "drop",
+    (e) => {
+      const files = e.dataTransfer && e.dataTransfer.files;
+      if (files && files.length) cacheFiles(files, AL.capture.dropTarget(firstTarget(e)));
+    },
+    true,
+  );
+
+  window.addEventListener("message", (e) => {
+    if (e.source !== window || !e.data || e.data.type !== "app-logger:detached-files") return;
+    const files = Array.from(e.data.files || []).filter((f) => f instanceof File);
+    const label = String(e.data.label || "");
+    if (files.length) {
+      cacheFiles(files, { fieldKey: `${location.host}${location.pathname}#detached:${label}`, fieldLabel: label });
+    }
+  });
+
+  // ---------------------------------------------------------------- answers
+
+  const pendingAnswers = new Map();
+  let answerTimer = null;
+
+  async function flushAnswers() {
+    const answers = [...pendingAnswers.values()];
+    pendingAnswers.clear();
+    if (!answers.length) return;
+    if (!state.capturing) {
+      // Another frame may have started a session since this page was evaluated.
+      const res = await send({ type: "shouldCapture", matched: false });
+      state.capturing = Boolean(res && res.capturing);
+    }
+    if (state.capturing) await send({ type: "answers", answers });
+  }
+
+  function onField(e) {
+    const t = firstTarget(e);
+    if (!t || !t.matches || !t.matches("input, textarea, select") || t.type === "file") return;
+    const answer = AL.capture.answerFor(t);
+    if (!answer) return;
+    pendingAnswers.set(answer.field_key, answer);
+    clearTimeout(answerTimer);
+    answerTimer = setTimeout(flushAnswers, cfg.answerDebounceMs);
+  }
+
+  document.addEventListener("change", onField, true);
+  document.addEventListener("focusout", onField, true);
+  // Don't lose the last few keystrokes when the tab navigates away.
+  window.addEventListener("pagehide", () => {
+    clearTimeout(answerTimer);
+    flushAnswers();
+  });
+
+  // ---------------------------------------------------------------- "applied here" toast
+
+  async function checkApplied() {
+    const posting = AL.capture.findJobPosting() || {};
+    const identifier = posting.identifier;
+    const jobId = identifier && typeof identifier === "object" ? identifier.value : identifier;
+    const org = posting.hiringOrganization;
+    const company = org && typeof org === "object" ? org.name : org;
+    const checkedUrl = location.href;
+    const res = await send({
+      type: "check",
+      url: checkedUrl,
+      jobId: jobId == null ? "" : String(jobId),
+      company: company == null ? "" : String(company),
+    });
+    if (res && res.applied && res.application && location.href === checkedUrl) showToast(res.application);
+  }
+
+  function removeToast() {
+    if (state.toast) state.toast.remove();
+    state.toast = null;
+  }
+
+  function showToast(application) {
+    removeToast();
+    const host = document.createElement("div");
+    host.setAttribute("data-application-logger", "toast");
+    // Closed shadow root: page CSS can't restyle it and page JS can't reach in.
+    const root = host.attachShadow({ mode: "closed" });
+    const date = new Date(application.applied_at);
+    const when = Number.isNaN(date.getTime())
+      ? application.applied_at
+      : date.toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" });
+
+    const style = document.createElement("style");
+    style.textContent = `
+      :host { all: initial; position: fixed; top: 16px; right: 16px; z-index: 2147483647; }
+      .toast { display: flex; align-items: flex-start; gap: 8px; max-width: 320px; padding: 10px 12px;
+        background: #1d1d1f; color: #fff; border-radius: 10px; box-shadow: 0 6px 24px rgba(0,0,0,.25);
+        font: 14px/1.4 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
+      button { all: unset; cursor: pointer; }
+      .main { flex: 1; }
+      .title { font-weight: 600; }
+      .sub { opacity: .75; font-size: 12px; margin-top: 2px; }
+      .close { padding: 0 4px; opacity: .7; font-size: 16px; line-height: 1; }
+      button:focus-visible { outline: 2px solid #4a9eff; outline-offset: 2px; border-radius: 4px; }
+    `;
+    const box = document.createElement("div");
+    box.className = "toast";
+    box.setAttribute("role", "status");
+
+    const main = document.createElement("button");
+    main.className = "main";
+    main.title = "Open in the Application Logger dashboard";
+    const title = document.createElement("div");
+    title.className = "title";
+    title.textContent = `You applied here on ${when}`;
+    const sub = document.createElement("div");
+    sub.className = "sub";
+    sub.textContent = [application.company, application.position].filter(Boolean).join(" — ");
+    main.append(title, sub);
+    main.addEventListener("click", () => send({ type: "openApplication", id: application.id }));
+
+    const close = document.createElement("button");
+    close.className = "close";
+    close.textContent = "×";
+    close.setAttribute("aria-label", "Dismiss");
+    close.addEventListener("click", removeToast);
+
+    box.append(main, close);
+    root.append(style, box);
+    (document.body || document.documentElement).append(host);
+    state.toast = host;
+  }
+
+  scheduleEvaluate();
+})();

@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Application</title>
+  <link rel="stylesheet" href="/static/dashboard.css">
+</head>
+<body>
+  <header class="topbar">
+    <a class="brand" href="/">Application Logger</a>
+    <nav>
+      <a href="/">Search</a>
+      <a href="/settings.html">Settings</a>
+    </nav>
+  </header>
+  <main>
+    <p class="small"><a href="/" id="back">← All applications</a></p>
+    <div id="messages"></div>
+    <div id="content" hidden>
+      <div class="header-row">
+        <div>
+          <h1 id="title"></h1>
+          <p id="subtitle" class="muted"></p>
+        </div>
+        <div id="delete-area"></div>
+      </div>
+
+      <section class="panel">
+        <h2>Details</h2>
+        <dl class="meta" id="meta"></dl>
+      </section>
+
+      <section class="panel">
+        <h2>Resume and cover letter</h2>
+        <div id="documents"></div>
+      </section>
+
+      <section class="panel">
+        <details open>
+          <summary>Posting text</summary>
+          <pre class="text" id="posting-text"></pre>
+        </details>
+      </section>
+
+      <section class="panel" id="snapshot-panel">
+        <details id="snapshot-details">
+          <summary>Archived page</summary>
+          <p class="muted small">The page as it looked when you logged it. Scripts are disabled.</p>
+          <div id="snapshot"></div>
+        </details>
+      </section>
+
+      <section class="panel">
+        <details open>
+          <summary id="answers-summary">Portal answers</summary>
+          <div id="answers"></div>
+        </details>
+      </section>
+
+      <section class="panel">
+        <details>
+          <summary id="pages-summary">Captured pages</summary>
+          <ul class="plain" id="pages"></ul>
+        </details>
+      </section>
+
+      <section class="panel" id="other-panel" hidden>
+        <h2>Other files</h2>
+        <div id="other-documents"></div>
+      </section>
+    </div>
+  </main>
+  <script type="module" src="/static/app.js"></script>
+</body>
+</html>

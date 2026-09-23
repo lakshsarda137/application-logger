@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Applications</title>
+  <link rel="stylesheet" href="/static/dashboard.css">
+</head>
+<body>
+  <header class="topbar">
+    <a class="brand" href="/">Application Logger</a>
+    <nav>
+      <a href="/" aria-current="page">Search</a>
+      <a href="/settings.html">Settings</a>
+    </nav>
+  </header>
+  <main>
+    <h1>Applications</h1>
+    <p id="count" class="muted small"></p>
+    <form class="search-row" id="search-form" role="search">
+      <input id="q" type="search" placeholder="Search company, role, posting, resume, answers…" aria-label="Search"
+             autocomplete="off" autofocus>
+      <button type="submit">Search</button>
+    </form>
+    <div id="messages"></div>
+    <ul id="results" class="results" aria-live="polite"></ul>
+  </main>
+  <script type="module" src="/static/index.js"></script>
+</body>
+</html>

@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Settings</title>
+  <link rel="stylesheet" href="/static/dashboard.css">
+</head>
+<body>
+  <header class="topbar">
+    <a class="brand" href="/">Application Logger</a>
+    <nav>
+      <a href="/">Search</a>
+      <a href="/settings.html" aria-current="page">Settings</a>
+    </nav>
+  </header>
+  <main>
+    <h1>Settings</h1>
+    <div id="messages"></div>
+
+    <section class="panel">
+      <h2>Save location</h2>
+      <p class="muted small">Resumes and cover letters are saved to
+        <code>{base path}/{Month}/{folder}</code>. Changes you make in Finder aren't reflected here.</p>
+      <form id="base-form">
+        <label class="field">Base path
+          <input id="base-path" autocomplete="off" spellcheck="false" required>
+        </label>
+        <div class="row">
+          <button type="submit" class="primary">Save</button>
+        </div>
+      </form>
+    </section>
+
+    <section class="panel">
+      <h2>This month's folder</h2>
+      <p id="month-status"></p>
+      <div class="row">
+        <button type="button" id="create-month" hidden>Create it now</button>
+      </div>
+      <p class="muted small">When the month's folder is missing, the log dialog asks before creating it.</p>
+    </section>
+
+    <section class="panel">
+      <h2>Extension</h2>
+      <p class="small">Paste the <code>api_token</code> from <code>config.local.json</code> into the extension's
+        options page (right-click the extension icon → Options).</p>
+    </section>
+  </main>
+  <script type="module" src="/static/settings.js"></script>
+</body>
+</html>

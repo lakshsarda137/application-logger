@@ -1,0 +1,92 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Log application</title>
+  <link rel="stylesheet" href="ui.css">
+</head>
+<body>
+  <main class="dialog">
+    <h1>Log application</h1>
+    <p id="source" class="muted ellipsis"></p>
+
+    <div id="banner" class="banner" hidden></div>
+
+    <section id="done" class="done" hidden>
+      <h2>Saved</h2>
+      <p>Files written to:</p>
+      <p><code id="done-path"></code></p>
+      <button type="button" id="close-done" class="primary">Close</button>
+    </section>
+
+    <form id="form" novalidate>
+      <fieldset>
+        <legend>Details</legend>
+        <label>Company
+          <input id="company" autocomplete="off">
+        </label>
+        <label>Position
+          <input id="position" autocomplete="off">
+        </label>
+        <label>Folder name
+          <input id="folder-name" autocomplete="off" required pattern="[a-z0-9_]+"
+                 title="Lowercase letters, digits and underscores">
+        </label>
+      </fieldset>
+
+      <fieldset>
+        <legend>Save to</legend>
+        <p class="path-row"><code id="save-path" class="ellipsis">…</code>
+          <button type="button" id="change-path" class="link">Change</button></p>
+
+        <div id="month-missing" class="prompt" hidden>
+          <p>There's no <strong id="month-name"></strong> folder. Create it?</p>
+          <button type="button" id="month-yes" class="primary">Yes</button>
+          <button type="button" id="month-no">No</button>
+        </div>
+
+        <div id="custom-dir" hidden>
+          <label>Folder (absolute path, must exist)
+            <input id="custom-path" placeholder="~/Desktop/Professional/Sophomore/Other" autocomplete="off">
+          </label>
+          <button type="button" id="use-month" class="link">Use this month's folder instead</button>
+        </div>
+      </fieldset>
+
+      <fieldset>
+        <legend>Files</legend>
+        <ul id="files" class="list"></ul>
+        <p id="no-files" class="muted" hidden>No files were captured.</p>
+        <label class="file-button">Add file from disk
+          <input type="file" id="add-file" multiple accept=".pdf,.doc,.docx,.txt,.rtf,.odt,.png,.jpg,.jpeg">
+        </label>
+        <details id="recent-box" hidden>
+          <summary id="recent-summary">Other recent uploads</summary>
+          <p class="muted small">Files you uploaded in other tabs in the last 24 hours.</p>
+          <ul id="recent" class="list compact"></ul>
+        </details>
+      </fieldset>
+
+      <fieldset>
+        <legend>Captured</legend>
+        <details>
+          <summary id="pages-summary">Pages</summary>
+          <p class="muted small">Choose which page is the job posting, and untick pages to leave out.</p>
+          <ul id="pages" class="list compact"></ul>
+        </details>
+        <details>
+          <summary id="answers-summary">Answers</summary>
+          <ul id="answers" class="list compact"></ul>
+        </details>
+      </fieldset>
+
+      <footer class="actions">
+        <span id="discard-area" class="grow"><button type="button" id="discard" class="link">Discard capture</button></span>
+        <button type="button" id="cancel">Cancel</button>
+        <button type="submit" id="save" class="primary">Save</button>
+      </footer>
+    </form>
+  </main>
+  <script type="module" src="log-dialog.js"></script>
+</body>
+</html>

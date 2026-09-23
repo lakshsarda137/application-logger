@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Optional: start the server automatically at login.
+  1. Replace /PATH/TO/application-logger below with the repo's absolute path.
+  2. cp scripts/com.applicationlogger.plist.example ~/Library/LaunchAgents/com.applicationlogger.plist
+  3. launchctl load ~/Library/LaunchAgents/com.applicationlogger.plist
+  Stop with: launchctl unload ~/Library/LaunchAgents/com.applicationlogger.plist
+-->
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>com.applicationlogger</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>/bin/bash</string>
+    <string>/PATH/TO/application-logger/scripts/start.sh</string>
+  </array>
+  <key>RunAtLoad</key>
+  <true/>
+  <key>KeepAlive</key>
+  <true/>
+  <key>StandardOutPath</key>
+  <string>/tmp/applicationlogger.log</string>
+  <key>StandardErrorPath</key>
+  <string>/tmp/applicationlogger.log</string>
+</dict>
+</plist>

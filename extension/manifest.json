@@ -1,0 +1,46 @@
+{
+  "manifest_version": 3,
+  "name": "Application Logger",
+  "version": "0.2.0",
+  "description": "Log job applications (posting, resume, cover letter, answers) to a local server.",
+  "minimum_chrome_version": "116",
+  "permissions": ["alarms", "contextMenus", "scripting", "storage", "unlimitedStorage", "webNavigation"],
+  "host_permissions": ["<all_urls>"],
+  "background": {
+    "service_worker": "background.js",
+    "type": "module"
+  },
+  "content_scripts": [
+    {
+      "matches": ["http://*/*", "https://*/*"],
+      "exclude_matches": ["*://127.0.0.1/*", "*://localhost/*"],
+      "js": ["lib/ats-domains.js", "lib/posting-keywords.js", "lib/capture.js", "content.js"],
+      "all_frames": true,
+      "match_about_blank": true,
+      "match_origin_as_fallback": true,
+      "run_at": "document_idle"
+    },
+    {
+      "matches": ["http://*/*", "https://*/*"],
+      "exclude_matches": ["*://127.0.0.1/*", "*://localhost/*"],
+      "js": ["lib/main-world-hook.js"],
+      "all_frames": true,
+      "match_about_blank": true,
+      "match_origin_as_fallback": true,
+      "run_at": "document_start",
+      "world": "MAIN"
+    }
+  ],
+  "options_ui": {
+    "page": "options.html",
+    "open_in_tab": true
+  },
+  "action": {
+    "default_title": "Open the Application Logger dashboard"
+  },
+  "icons": {
+    "16": "icons/icon16.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  }
+}

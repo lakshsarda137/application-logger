@@ -1,0 +1,12 @@
+{
+  "name": "application-logger",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "node --test 'extension/tests/*.test.js'"
+  },
+  "devDependencies": {
+    "fake-indexeddb": "^6.2.5",
+    "jsdom": "^26.0.0"
+  }
+}

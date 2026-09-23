@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Application Logger settings</title>
+  <link rel="stylesheet" href="ui.css">
+</head>
+<body>
+  <main class="page">
+    <h1>Application Logger</h1>
+    <p class="muted">Connects the extension to the local server. The API token is in
+      <code>config.local.json</code> (created the first time the server starts).</p>
+
+    <form id="form">
+      <fieldset>
+        <legend>Server</legend>
+        <label>Server URL
+          <input id="server-url" placeholder="http://127.0.0.1:8765" autocomplete="off">
+        </label>
+        <label>API token
+          <input id="api-token" type="password" autocomplete="off" spellcheck="false">
+        </label>
+      </fieldset>
+      <footer class="actions">
+        <button type="button" id="dashboard">Open dashboard</button>
+        <button type="button" id="test">Test connection</button>
+        <button type="submit" class="primary">Save</button>
+      </footer>
+    </form>
+
+    <div id="status" class="banner" hidden></div>
+  </main>
+  <script type="module" src="options.js"></script>
+</body>
+</html>
