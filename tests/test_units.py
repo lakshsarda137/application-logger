@@ -12,7 +12,7 @@ from server import db, storage
 from server.config import load_config
 from server.extract import extract_text
 from server.jobposting import parse_jobposting
-from server.urls import detect_ats, normalize_url
+from server.urls import detect_ats, is_ats_page, is_never_capture, normalize_url, site_of
 
 NOW = datetime(2026, 10, 3, 14, 32)
 
@@ -164,6 +164,29 @@ def test_detect_ats():
     assert detect_ats("https://jobs.lever.co/acme") == "lever"
     assert detect_ats("https://notlever.co/acme") is None
     assert detect_ats("https://acme.com/careers") is None
+
+
+def test_site_of():
+    assert site_of("https://careers.acme.com/jobs/1") == "acme.com"
+    assert site_of("https://www.linkedin.com/in/x") == "linkedin.com"
+    assert site_of("https://jobs.acme.co.uk/1") == "acme.co.uk"
+    assert site_of("https://127.0.0.1:8765/") == "127.0.0.1"
+    assert site_of("") == "" and site_of("not a url") == ""
+
+
+def test_is_ats_page_is_path_aware_for_linkedin():
+    assert is_ats_page("https://www.linkedin.com/jobs/view/1")
+    assert not is_ats_page("https://www.linkedin.com/in/me/")
+    assert not is_ats_page("https://www.linkedin.com/feed/")
+    assert is_ats_page("https://job-boards.greenhouse.io/embed/job_app?for=x")
+    assert not is_ats_page("https://seatgeek.com/jobs/1")
+
+
+def test_is_never_capture():
+    assert is_never_capture("https://mail.google.com/mail/u/0/#inbox")
+    assert is_never_capture("https://docs.google.com/document/d/1")
+    assert is_never_capture("https://www.instagram.com/x")
+    assert not is_never_capture("https://careers.google.com/jobs/1")
 
 
 # ---------------------------------------------------------------- jobposting

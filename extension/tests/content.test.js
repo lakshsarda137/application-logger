@@ -14,8 +14,8 @@ afterEach(() => {
   while (open.length) open.pop().window.close();
 });
 
-function start(html, { url, capturing = true, applied = null, hook = false } = {}) {
-  const dom = makePage(html, { url, config: FAST });
+function start(html, { url, capturing = true, applied = null, hook = false, config = {} } = {}) {
+  const dom = makePage(html, { url, config: { ...FAST, ...config } });
   open.push(dom);
   const sent = [];
   dom.window.chrome = {
@@ -50,7 +50,7 @@ const POSTING = `<html><head><title>SWE at Acme</title>
 test("posting page: asks to capture, sends a snapshot, checks 'applied here'", async () => {
   const t = start(POSTING, { url: "https://careers.acme.com/jobs/9" });
   await until(() => t.of("check").length, "check");
-  assert.deepEqual(t.of("shouldCapture")[0], { type: "shouldCapture", matched: true });
+  assert.deepEqual(t.of("shouldCapture")[0], { type: "shouldCapture", matched: true, url: "https://careers.acme.com/jobs/9" });
   const page = t.of("page")[0];
   assert.equal(page.snapshot.url, "https://careers.acme.com/jobs/9");
   assert.equal(page.isPosting, true);
@@ -64,7 +64,7 @@ test("unrelated page: nothing captured, but the applied check still runs", async
     capturing: false,
   });
   await until(() => t.of("check").length, "check");
-  assert.deepEqual(t.of("shouldCapture")[0], { type: "shouldCapture", matched: false });
+  assert.deepEqual(t.of("shouldCapture")[0], { type: "shouldCapture", matched: false, url: "https://blog.example.com/post" });
   assert.equal(t.of("page").length, 0);
 });
 
@@ -285,4 +285,34 @@ test("detached inputs on job pages are renamed by the page-world hook", async ()
   assert.equal(seenBySite, "Ada_Lovelace_Resume.pdf");
   await until(() => t.of("upload").length, "upload");
   assert.equal(t.of("upload")[0].files[0].filename, "Ada_Lovelace_Resume.pdf");
+});
+
+test("never-capture sites (Gmail, Docs, …) send no pages or answers, but uploads are still cached", async () => {
+  const t = start(`<body><p>Qualifications Requirements Responsibilities</p>
+    <label for="q">Subject</label><input id="q"><label for="cv">Attach</label><input type="file" id="cv"></body>`, {
+    url: "https://mail.google.com/mail/u/0/#inbox",
+    capturing: true,
+  });
+  await until(() => t.of("check").length, "evaluated");
+  assert.equal(t.of("shouldCapture").length, 0);
+  assert.equal(t.of("page").length, 0);
+  const q = t.doc.getElementById("q");
+  q.value = "Hello";
+  q.dispatchEvent(new t.window.Event("change", { bubbles: true }));
+  await pick(t, "cv", "resume.pdf");
+  await new Promise((r) => setTimeout(r, 60));
+  assert.equal(t.of("answers").length, 0);
+  assert.equal(t.of("upload").length, 1);
+});
+
+test("empty embedded frames (ads, captchas) aren't sent as pages", async () => {
+  // jsdom windows are always top-level, so tell content.js this is an iframe.
+  const t = start(`<body><div></div></body>`, {
+    url: "https://www.google.com/recaptcha/anchor",
+    capturing: true,
+    config: { isTop: false },
+  });
+  await until(() => t.of("shouldCapture").length, "asked");
+  await new Promise((r) => setTimeout(r, 80));
+  assert.equal(t.of("page").length, 0);
 });

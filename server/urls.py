@@ -111,3 +111,48 @@ def detect_ats(url: str | None) -> str | None:
         if host == suffix or host.endswith("." + suffix):
             return name
     return None
+
+
+# Personal/productivity sites; mirrors AppLogger.NEVER_CAPTURE in extension/lib/ats-domains.js.
+NEVER_CAPTURE = (
+    "mail.google.com", "docs.google.com", "drive.google.com", "calendar.google.com",
+    "meet.google.com", "chat.google.com", "contacts.google.com", "accounts.google.com",
+    "keep.google.com", "outlook.live.com", "outlook.office.com", "outlook.office365.com",
+    "slack.com", "web.whatsapp.com", "instagram.com", "facebook.com", "messenger.com",
+    "x.com", "twitter.com", "reddit.com", "youtube.com", "claude.ai", "chatgpt.com", "notion.so",
+)
+
+_MULTI_PART_SUFFIX = re.compile(r"\.(co|com|ac|org|net|gov|edu)\.[a-z]{2}$")
+
+
+def _hostname(url: str | None) -> str:
+    try:
+        return (urlsplit((url or "").strip()).hostname or "").lower().rstrip(".")
+    except ValueError:
+        return ""
+
+
+def site_of(url: str | None) -> str:
+    """Registrable domain, roughly: careers.acme.com -> acme.com, x.co.uk -> x.co.uk."""
+    host = _hostname(url)
+    if not host or re.fullmatch(r"[\d.]+", host) or ":" in host:
+        return host
+    parts = host.split(".")
+    return ".".join(parts[-3:] if _MULTI_PART_SUFFIX.search(host) else parts[-2:])
+
+
+def is_never_capture(url: str | None) -> bool:
+    host = _hostname(url)
+    return any(host == d or host.endswith("." + d) for d in NEVER_CAPTURE)
+
+
+def is_ats_page(url: str | None) -> bool:
+    """Like detect_ats, but LinkedIn only counts under /jobs (not profiles or the feed)."""
+    platform = detect_ats(url)
+    if platform != "linkedin":
+        return platform is not None
+    try:
+        path = urlsplit(url or "").path
+    except ValueError:
+        return False
+    return path == "/jobs" or path.startswith("/jobs/")

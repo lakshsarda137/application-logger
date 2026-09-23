@@ -2,13 +2,14 @@
 // chrome.* calls (they come in through `deps`) so it can be tested in Node.
 //
 // Messages (all from content.js, sender.tab.id identifies the tab):
-//   shouldCapture {matched}                 -> {capturing}
+//   shouldCapture {matched, url}            -> {capturing}
 //   page          {snapshot, isPosting}     -> {ok}
 //   answers       {answers}                 -> {ok}
 //   upload        {fieldKey, fieldLabel, pageUrl, files: [{..., base64}]} -> {ok}
 //   check         {url, jobId, company}     -> server's /applications/check result, or null
 //   openApplication {id}                    -> opens the dashboard page
 
+import { BROAD_SITES, siteOf } from "./sites.js";
 import {
   ensureSession,
   findSessionForTab,
@@ -67,8 +68,10 @@ export async function handleMessage(msg, sender, deps) {
     case "shouldCapture":
       return withTabLock(tabId, async () => {
         if (tabId == null) return { capturing: false };
+        const site = siteOf(msg.url || sender?.url || "");
         if (msg.matched) {
-          await ensureSession(tabId, { strong: true, openerTabId: await deps.openerOf(tabId) }, now);
+          const extendTo = BROAD_SITES.has(site) ? "" : site;
+          await ensureSession(tabId, { strong: true, openerTabId: await deps.openerOf(tabId), site: extendTo }, now);
           return { capturing: true };
         }
         let session = await findSessionForTab(tabId, now);
@@ -78,7 +81,10 @@ export async function handleMessage(msg, sender, deps) {
           const openerSession = opener == null ? null : await findSessionForTab(opener, now);
           if (openerSession) session = await ensureSession(tabId, { openerTabId: opener }, now);
         }
-        return { capturing: Boolean(session && session.strong) };
+        // Rule 4: an unmatched page is captured only on a site where a matched
+        // page of this session lives (e.g. careers.acme.com/apply/2).
+        const onSessionSite = Boolean(site) && (session?.sites || []).includes(site);
+        return { capturing: Boolean(session && session.strong && onSessionSite) };
       });
 
     case "page":

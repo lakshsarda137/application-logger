@@ -7,9 +7,11 @@
 //
 // A session is "strong" once any of its pages matched the job-posting rules
 // (ATS domain, keywords, JSON-LD) or the user logged from it. Only strong
-// sessions make later, unmatched pages get captured (rule 4). An upload on an
-// unrelated site still gets cached (in a weak session) so it's never lost, but
-// it doesn't start snapshotting that tab.
+// sessions make later, unmatched pages get captured (rule 4), and only on the
+// sites (`sites`) of pages that matched, so wandering off to Gmail or LinkedIn
+// in the same tab isn't captured. An upload on an unrelated site still gets
+// cached (in a weak session) so it's never lost, but it doesn't start
+// snapshotting that tab.
 
 import { ANSWERS, PAGES, req, SESSIONS, transact, UPLOADS } from "./idb.js";
 
@@ -44,7 +46,7 @@ export function getSession(sessionId) {
  * The tab's active session, else its opener's (the tab joins it), else a new one.
  * `strong: true` upgrades the session; it never downgrades.
  */
-export function ensureSession(tabId, { strong = false, openerTabId = null } = {}, now = Date.now()) {
+export function ensureSession(tabId, { strong = false, openerTabId = null, site = "" } = {}, now = Date.now()) {
   return transact(SESSIONS, "readwrite", async (st) => {
     let s = await activeForTab(st, tabId, now);
     if (!s && openerTabId != null && openerTabId !== tabId) {
@@ -52,10 +54,13 @@ export function ensureSession(tabId, { strong = false, openerTabId = null } = {}
       if (s) s.tabIds = [...new Set([...s.tabIds, tabId])];
     }
     if (!s) {
-      s = { id: crypto.randomUUID(), tabIds: [tabId], createdAt: now, lastActivity: now, strong: false };
+      s = { id: crypto.randomUUID(), tabIds: [tabId], createdAt: now, lastActivity: now, strong: false, sites: [] };
     }
     s.lastActivity = now;
     if (strong) s.strong = true;
+    // Sites of pages that matched rules 1–3; rule 4 only extends to these.
+    s.sites = s.sites || [];
+    if (site && !s.sites.includes(site)) s.sites.push(site);
     await req(st[SESSIONS].put(s));
     return s;
   });

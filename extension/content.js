@@ -24,7 +24,9 @@
   };
 
   const cfg = Object.assign({ quietMs: 800, maxSettleMs: 6000, urlPollMs: 1000, answerDebounceMs: 400 }, AL.config);
-  const isTop = window.top === window.self;
+  const isTop = cfg.isTop ?? window.top === window.self; // cfg.isTop: tests only
+  // Gmail, Docs, Instagram, …: never snapshotted, no answers kept (uploads still are).
+  const neverCapture = AL.isNeverCapture(location.hostname);
   const state = { capturing: false, url: location.href, toast: null };
 
   function send(message) {
@@ -65,15 +67,21 @@
     await settled();
     if (url !== location.href) return; // navigated again; that evaluation will run
 
+    if (neverCapture) {
+      if (isTop) checkApplied();
+      return;
+    }
     const signals = AL.capture.signals();
     const matched = signals.ats || signals.jsonld || signals.keywords;
-    const res = await send({ type: "shouldCapture", matched });
+    const res = await send({ type: "shouldCapture", matched, url: location.href });
     state.capturing = Boolean(res && res.capturing);
     publishJobPage();
 
     if (state.capturing) {
       const snap = await AL.capture.snapshot({ files: false });
-      await send({ type: "page", snapshot: snap, isPosting: signals.jsonld || signals.keywords });
+      // Embedded frames with no text (ads, trackers, captchas) aren't pages worth keeping.
+      const worthKeeping = isTop || snap.text.trim().length >= 20;
+      if (worthKeeping) await send({ type: "page", snapshot: snap, isPosting: signals.jsonld || signals.keywords });
       if (snap.answers.length) await send({ type: "answers", answers: snap.answers });
     }
     if (isTop) checkApplied();
@@ -186,10 +194,10 @@
   async function flushAnswers() {
     const answers = [...pendingAnswers.values()];
     pendingAnswers.clear();
-    if (!answers.length) return;
+    if (!answers.length || neverCapture) return;
     if (!state.capturing) {
       // Another frame may have started a session since this page was evaluated.
-      const res = await send({ type: "shouldCapture", matched: false });
+      const res = await send({ type: "shouldCapture", matched: false, url: location.href });
       state.capturing = Boolean(res && res.capturing);
     }
     if (state.capturing) await send({ type: "answers", answers });

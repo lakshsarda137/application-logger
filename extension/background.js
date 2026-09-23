@@ -9,6 +9,7 @@
 
 import { api, getConnection } from "./lib/api.js";
 import { handleMessage, toStoredFiles, withTabLock } from "./lib/messages.js";
+import { siteOf } from "./lib/sites.js";
 import {
   clearAllTabLinks,
   ensureSession,
@@ -21,6 +22,16 @@ import {
 } from "./lib/sessions.js";
 
 const MENU_ID = "log-application";
+
+// Mirrors AppLogger.NEVER_CAPTURE in lib/ats-domains.js (a classic script the worker can't import).
+const NEVER_CAPTURE = /(^|\.)(mail|docs|drive|calendar|meet|chat|contacts|accounts|keep)\.google\.com$|(^|\.)(outlook\.live\.com|outlook\.office(365)?\.com|slack\.com|web\.whatsapp\.com|instagram\.com|facebook\.com|messenger\.com|x\.com|twitter\.com|reddit\.com|youtube\.com|claude\.ai|chatgpt\.com|notion\.so)$/;
+function isNeverCapture(url) {
+  try {
+    return NEVER_CAPTURE.test(new URL(url).hostname.toLowerCase());
+  } catch {
+    return false;
+  }
+}
 const CAPTURE_FILES = ["lib/ats-domains.js", "lib/posting-keywords.js", "lib/capture.js"];
 
 chrome.runtime.onInstalled.addListener(() => {
@@ -133,11 +144,11 @@ async function logApplication(tab) {
   }
 
   const session = await withTabLock(tab.id, async () => {
-    const s = await ensureSession(tab.id, { strong: true, openerTabId: tab.openerTabId ?? null });
+    const s = await ensureSession(tab.id, { strong: true, openerTabId: tab.openerTabId ?? null, site: siteOf(tab.url) });
     for (const f of frames) {
-      if (/^https?:/i.test(f.url)) {
+      if (/^https?:/i.test(f.url) && !isNeverCapture(f.url)) {
         const posting = f.signals.jsonld || f.signals.keywords;
-        if (f.isTop || f.text.trim()) await putPage(s.id, { ...f, isPosting: posting });
+        if (f.isTop || f.text.trim().length >= 20) await putPage(s.id, { ...f, isPosting: posting });
       }
       if (f.answers.length) await putAnswers(s.id, f.answers);
       for (const group of f.files) {

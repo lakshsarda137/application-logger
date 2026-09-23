@@ -27,27 +27,62 @@ test("an unmatched page in a tab without a session is not captured", async () =>
   assert.deepEqual(await handleMessage({ type: "page", snapshot: snap("https://blog.com") }, from(tab), d), { ok: false });
 });
 
-test("matched page starts a strong session; later unmatched pages in the tab are captured (rule 4)", async () => {
+test("rule 4: after a matched page, unmatched pages on the same site are captured", async () => {
   const tab = nextTab++;
   const d = deps();
-  assert.deepEqual(await handleMessage({ type: "shouldCapture", matched: true }, from(tab), d), { capturing: true });
-  await handleMessage({ type: "page", snapshot: snap("https://jobs.lever.co/acme/1"), isPosting: true }, from(tab), d);
-  assert.deepEqual(await handleMessage({ type: "shouldCapture", matched: false }, from(tab), d), { capturing: true });
-  await handleMessage({ type: "page", snapshot: snap("https://acme.com/apply/step2") }, from(tab), d);
+  const ask = (url, matched = false) => handleMessage({ type: "shouldCapture", matched, url }, from(tab), d);
+  assert.deepEqual(await ask("https://careers.acme.com/jobs/1", true), { capturing: true });
+  await handleMessage({ type: "page", snapshot: snap("https://careers.acme.com/jobs/1"), isPosting: true }, from(tab), d);
+  // Multi-page application on the company's own site (subdomains count as the same site).
+  assert.deepEqual(await ask("https://apply.acme.com/step2"), { capturing: true });
+  await handleMessage({ type: "page", snapshot: snap("https://apply.acme.com/step2") }, from(tab), d);
   const { pages } = await getSessionData((await findSessionForTab(tab)).id);
   assert.deepEqual(pages.map((p) => [p.url, p.isPosting]).sort(), [
-    ["https://acme.com/apply/step2", false],
-    ["https://jobs.lever.co/acme/1", true],
+    ["https://apply.acme.com/step2", false],
+    ["https://careers.acme.com/jobs/1", true],
   ]);
 });
 
-test("a tab opened from a posting tab joins its session", async () => {
+test("rule 4 does not follow you to other sites in the same tab", async () => {
+  const tab = nextTab++;
+  const d = deps();
+  const ask = (url, matched = false) => handleMessage({ type: "shouldCapture", matched, url }, from(tab), d);
+  await ask("https://job-boards.greenhouse.io/embed/job_app?for=seatgeek", true);
+  await ask("https://seatgeek.com/jobs/8227553", true);
+  for (const url of [
+    "https://www.linkedin.com/in/someone/",
+    "https://mail.google.com/mail/u/0/#inbox",
+    "https://www.instagram.com/stories/x/",
+    "https://li.protechts.net/index.html",
+  ]) {
+    assert.deepEqual(await ask(url), { capturing: false }, url);
+  }
+  assert.deepEqual(await ask("https://seatgeek.com/jobs/apply"), { capturing: true });
+});
+
+test("a matched page on a broad site (LinkedIn jobs) doesn't make the rest of that site capturable", async () => {
+  const tab = nextTab++;
+  const d = deps();
+  const ask = (url, matched = false) => handleMessage({ type: "shouldCapture", matched, url }, from(tab), d);
+  assert.deepEqual(await ask("https://www.linkedin.com/jobs/view/123", true), { capturing: true });
+  assert.deepEqual(await ask("https://www.linkedin.com/in/me/?isSelfProfile=true"), { capturing: false });
+  assert.deepEqual(await ask("https://www.linkedin.com/feed/"), { capturing: false });
+});
+
+test("a tab opened from a posting tab joins its session (same site only)", async () => {
   const opener = nextTab++;
   const child = nextTab++;
   const d = deps({ openers: { [child]: opener } });
-  await handleMessage({ type: "shouldCapture", matched: true }, from(opener), d);
-  assert.deepEqual(await handleMessage({ type: "shouldCapture", matched: false }, from(child), d), { capturing: true });
+  await handleMessage({ type: "shouldCapture", matched: true, url: "https://careers.acme.com/jobs/1" }, from(opener), d);
+  assert.deepEqual(
+    await handleMessage({ type: "shouldCapture", matched: false, url: "https://careers.acme.com/apply" }, from(child), d),
+    { capturing: true },
+  );
   assert.equal((await findSessionForTab(child)).id, (await findSessionForTab(opener)).id);
+  assert.deepEqual(
+    await handleMessage({ type: "shouldCapture", matched: false, url: "https://news.example.com/" }, from(child), d),
+    { capturing: false },
+  );
 });
 
 test("uploads are cached on any page, but don't make the tab capture pages", async () => {

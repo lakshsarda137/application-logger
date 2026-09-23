@@ -36,6 +36,42 @@
     "indeed.com",
   ];
 
+  // Personal/productivity sites whose pages are never snapshotted, even when
+  // their text looks like a job posting (an inbox full of job alerts) or the tab
+  // belongs to a capture session. Uploads there are still cached. Keep in sync
+  // with NEVER_CAPTURE in server/urls.py.
+  AL.NEVER_CAPTURE = [
+    "mail.google.com",
+    "docs.google.com",
+    "drive.google.com",
+    "calendar.google.com",
+    "meet.google.com",
+    "chat.google.com",
+    "contacts.google.com",
+    "accounts.google.com",
+    "keep.google.com",
+    "outlook.live.com",
+    "outlook.office.com",
+    "outlook.office365.com",
+    "slack.com",
+    "web.whatsapp.com",
+    "instagram.com",
+    "facebook.com",
+    "messenger.com",
+    "x.com",
+    "twitter.com",
+    "reddit.com",
+    "youtube.com",
+    "claude.ai",
+    "chatgpt.com",
+    "notion.so",
+  ];
+
+  AL.isNeverCapture = function (hostname) {
+    const host = String(hostname || "").toLowerCase().replace(/\.$/, "");
+    return AL.NEVER_CAPTURE.some((d) => host === d || host.endsWith("." + d));
+  };
+
   AL.isAtsPage = function (hostname, pathname) {
     const host = String(hostname || "").toLowerCase().replace(/\.$/, "");
     const path = String(pathname || "/");

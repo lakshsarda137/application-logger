@@ -30,7 +30,7 @@ from .config import Config, load_config
 from .extract import extract_text
 from .jobposting import parse_jobposting
 from .search import search
-from .urls import detect_ats, normalize_url
+from .urls import detect_ats, is_ats_page, is_never_capture, normalize_url, site_of
 
 log = logging.getLogger("application_logger")
 
@@ -114,6 +114,20 @@ def _host(url: str | None) -> str:
     except ValueError:
         return ""
     return host[4:] if host.startswith("www.") else host
+
+
+def _page_in_flow(page_url: str, posting_url: str | None, company: str | None) -> bool:
+    """Is a captured page plausibly part of this application (vs. something browsed alongside)?"""
+    if is_never_capture(page_url):
+        return False
+    if is_ats_page(page_url):
+        return True
+    page_site = site_of(page_url)
+    if page_site and page_site == site_of(posting_url) and not is_ats_page(posting_url):
+        return True
+    # The company's own careers site: "seatgeek.com" for company "SeatGeek".
+    slug = re.sub(r"[^a-z0-9]", "", (company or "").lower())
+    return len(slug) >= 4 and slug in re.sub(r"[^a-z0-9]", "", page_site)
 
 
 def _with_base_tag(html: str, url: str | None) -> str:
@@ -397,12 +411,19 @@ def create_app(config: Config | None = None) -> FastAPI:
         norm = normalize_url(url)
         if norm:
             for r in conn.execute(
-                f"SELECT {cols} FROM applications a WHERE a.posting_url_normalized = ?"
-                f" UNION SELECT {cols} FROM applications a"
-                f" JOIN application_pages p ON p.application_id = a.id WHERE p.url_normalized = ?",
-                (norm, norm),
+                f"SELECT {cols} FROM applications a WHERE a.posting_url_normalized = ?", (norm,)
             ):
                 matches.append(("url", r))
+            # Other captured pages count only if they're part of the application
+            # flow. Older captures could include unrelated pages (Gmail, your
+            # LinkedIn profile) that must never say "you applied here".
+            for r in conn.execute(
+                f"SELECT {cols}, p.url AS page_url FROM applications a"
+                f" JOIN application_pages p ON p.application_id = a.id WHERE p.url_normalized = ?",
+                (norm,),
+            ):
+                if _page_in_flow(r["page_url"], r["posting_url"], r["company"]):
+                    matches.append(("url", r))
 
         # Job IDs like "R12345" repeat across companies, so require the same
         # host or the same company name too.

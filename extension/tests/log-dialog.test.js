@@ -275,3 +275,14 @@ test("resume/cover letter names are shown and saved without copy numbers", async
   assert.deepEqual(payload.documents.map((x) => x.filename), ["Ada_Lovelace_Resume.pdf", "transcript (3).pdf"]);
   assert.deepEqual(posted.body.getAll("files").map((f) => f.name), ["Ada_Lovelace_Resume.pdf", "transcript (3).pdf"]);
 });
+
+test("pages captured well before the posting start unticked", async () => {
+  const s = await ensureSession(nextTab++, { strong: true }, NOW);
+  const at = (minAgo) => new Date(NOW - minAgo * 60_000).toISOString();
+  await putPage(s.id, { url: "https://job-boards.greenhouse.io/other/jobs/1", title: "Earlier job", isTop: true, isPosting: true, capturedAt: at(30) }, NOW);
+  await putPage(s.id, { url: "https://acme.com/jobs/2", title: "The posting", isTop: true, jsonld: { title: "SWE" }, capturedAt: at(10) }, NOW);
+  await putPage(s.id, { url: "https://acme.com/apply/2", title: "Apply", isTop: true, capturedAt: at(5) }, NOW);
+  const d = await openDialog(s.id, okServer());
+  await until(() => d.$("pages-summary").textContent === "2 of 3 page(s)", "defaults");
+  assert.deepEqual(d.all("#pages input[type=checkbox]").map((b) => b.checked), [false, true, true]);
+});

@@ -423,7 +423,13 @@ async function init() {
   }
 
   const built = buildLogData(data);
-  state.pages = built.pages.map((p) => ({ ...p, include: true }));
+  // Pages from well before the posting (e.g. a different job browsed earlier in
+  // the same tab) start unticked; the posting and everything after are included.
+  const postingAt = Date.parse(built.posting?.capturedAt) || 0;
+  state.pages = built.pages.map((p) => ({
+    ...p,
+    include: p.id === built.posting?.id || !postingAt || (Date.parse(p.capturedAt) || 0) >= postingAt - 60_000,
+  }));
   state.postingIndex = Math.max(0, state.pages.findIndex((p) => p.id === built.posting?.id));
   state.answers = built.answers;
   for (const u of built.files) addFile({ ...u, source: "page" });

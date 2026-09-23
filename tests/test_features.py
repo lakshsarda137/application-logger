@@ -182,6 +182,41 @@ def test_check_returns_most_recent(client, month_dir):
     assert body["application"]["id"] == second["id"] != first["id"]
 
 
+def test_check_ignores_unrelated_pages_captured_alongside(client, month_dir):
+    # Shape of a real capture that went wrong: the application's own pages plus
+    # things browsed in the same tab (Gmail, a LinkedIn profile, an ad frame).
+    app = log_app(
+        client,
+        company="SeatGeek",
+        url="https://job-boards.greenhouse.io/embed/job_app?for=seatgeek&validityToken=abc",
+        pages=[
+            "https://job-boards.greenhouse.io/embed/job_app?for=seatgeek&validityToken=abc",
+            "https://seatgeek.com/jobs/8227553",
+            "https://www.linkedin.com/in/someone/?isSelfProfile=true",
+            "https://mail.google.com/mail/u/0/#inbox",
+            "https://docs.google.com/spreadsheets/d/1/edit",
+            "https://li.protechts.net/index.html",
+        ],
+    )
+    check = lambda url: client.get("/applications/check", params={"url": url}).json()
+    assert check("https://seatgeek.com/jobs/8227553")["application"]["id"] == app["id"]  # company site
+    assert check("https://job-boards.greenhouse.io/embed/job_app?for=seatgeek&validityToken=abc")["applied"]
+    for url in [
+        "https://www.linkedin.com/in/someone/?isSelfProfile=true",
+        "https://mail.google.com/mail/u/0/#inbox",
+        "https://docs.google.com/spreadsheets/d/1/edit",
+        "https://li.protechts.net/index.html",
+    ]:
+        assert check(url)["applied"] is False, url
+
+
+def test_check_linkedin_posting_doesnt_match_profile_pages(client, month_dir):
+    log_app(client, company="Acme", url="https://www.linkedin.com/jobs/view/123",
+            pages=["https://www.linkedin.com/jobs/view/123", "https://www.linkedin.com/in/me/"])
+    assert client.get("/applications/check", params={"url": "https://www.linkedin.com/jobs/view/123"}).json()["applied"]
+    assert not client.get("/applications/check", params={"url": "https://www.linkedin.com/in/me/"}).json()["applied"]
+
+
 def test_check_ignores_empty_input(client, month_dir):
     log_app(client)
     assert client.get("/applications/check").json()["applied"] is False

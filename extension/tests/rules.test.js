@@ -59,3 +59,12 @@ test("rule 3: JSON-LD signal via capture.signals", () => {
   const al = loadScripts(dom.window, CAPTURE_FILES);
   assert.deepEqual({ ...al.capture.signals() }, { ats: false, jsonld: true, keywords: false });
 });
+
+test("never-capture hosts: personal and productivity sites", () => {
+  for (const h of ["mail.google.com", "docs.google.com", "www.instagram.com", "claude.ai", "acme.slack.com", "x.com"]) {
+    assert.equal(AL.isNeverCapture(h), true, h);
+  }
+  for (const h of ["careers.google.com", "www.google.com", "boards.greenhouse.io", "www.linkedin.com", "box.com"]) {
+    assert.equal(AL.isNeverCapture(h), false, h);
+  }
+});
