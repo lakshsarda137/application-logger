@@ -5,35 +5,44 @@
 (function (g) {
   const AL = (g.AppLogger = g.AppLogger || {});
 
+  // Hosts (and path prefixes) that only serve job postings and applications.
+  // Multi-purpose sites are narrowed to their candidate-facing parts, e.g. not
+  // all of workday.com or rippling.com (their employee apps live there too).
   AL.ATS_DOMAINS = [
     "myworkdayjobs.com",
     "myworkdaysite.com",
-    "workday.com",
     "greenhouse.io",
     "lever.co",
     "ashbyhq.com",
-    "smartrecruiters.com",
+    "jobs.smartrecruiters.com",
+    "careers.smartrecruiters.com",
     "icims.com",
     "jobvite.com",
-    "workable.com",
-    "bamboohr.com",
+    "apply.workable.com",
+    "bamboohr.com/careers",
+    "bamboohr.com/jobs",
     "taleo.net",
-    "successfactors.com",
-    "oraclecloud.com",
+    "successfactors.com/career",
+    "successfactors.eu/career",
+    "oraclecloud.com/hcmUI/CandidateExperience",
     "eightfold.ai",
-    "rippling.com",
+    "ats.rippling.com",
     "breezy.hr",
     "recruitee.com",
-    "jazzhr.com",
     "applytojob.com",
+    "jazzhr.com",
     "teamtailor.com",
-    "personio.com",
-    "dover.com",
-    "wellfound.com",
-    "handshake.com",
-    "joinhandshake.com",
+    "jobs.personio.com",
+    "jobs.personio.de",
+    "app.dover.com",
+    "wellfound.com/jobs",
+    "joinhandshake.com/jobs",
+    "joinhandshake.com/stu/jobs",
     "linkedin.com/jobs",
-    "indeed.com",
+    "indeed.com/viewjob",
+    "indeed.com/jobs",
+    "indeed.com/applystart",
+    "smartapply.indeed.com",
   ];
 
   // Personal/productivity sites whose pages are never snapshotted, even when

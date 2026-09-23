@@ -30,7 +30,7 @@ test("captures url, title, text, html and JSON-LD JobPosting from @graph", async
   assert.match(snap.text, /Software Engineer/);
   assert.match(snap.html, /<h1>Software Engineer<\/h1>/);
   assert.equal(snap.jsonld.title, "SWE");
-  assert.deepEqual(snap.signals, { ats: true, jsonld: true, keywords: false });
+  assert.deepEqual(snap.signals, { ats: true, jsonld: true, keywords: false, form: false, fillable: false });
 });
 
 test("captures text inputs, textareas and selects with their labels", async () => {

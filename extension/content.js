@@ -72,8 +72,8 @@
       return;
     }
     const signals = AL.capture.signals();
-    const matched = signals.ats || signals.jsonld || signals.keywords;
-    const res = await send({ type: "shouldCapture", matched, url: location.href });
+    const matched = signals.ats || signals.jsonld || signals.keywords || signals.form;
+    const res = await send({ type: "shouldCapture", matched, url: location.href, hasForm: signals.fillable });
     state.capturing = Boolean(res && res.capturing);
     publishJobPage();
 
@@ -197,7 +197,8 @@
     if (!answers.length || neverCapture) return;
     if (!state.capturing) {
       // Another frame may have started a session since this page was evaluated.
-      const res = await send({ type: "shouldCapture", matched: false, url: location.href });
+      // The user is typing into this page, so it has a form by definition.
+      const res = await send({ type: "shouldCapture", matched: false, url: location.href, hasForm: true });
       state.capturing = Boolean(res && res.capturing);
     }
     if (state.capturing) await send({ type: "answers", answers });

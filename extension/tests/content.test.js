@@ -50,7 +50,7 @@ const POSTING = `<html><head><title>SWE at Acme</title>
 test("posting page: asks to capture, sends a snapshot, checks 'applied here'", async () => {
   const t = start(POSTING, { url: "https://careers.acme.com/jobs/9" });
   await until(() => t.of("check").length, "check");
-  assert.deepEqual(t.of("shouldCapture")[0], { type: "shouldCapture", matched: true, url: "https://careers.acme.com/jobs/9" });
+  assert.deepEqual(t.of("shouldCapture")[0], { type: "shouldCapture", matched: true, url: "https://careers.acme.com/jobs/9", hasForm: true });
   const page = t.of("page")[0];
   assert.equal(page.snapshot.url, "https://careers.acme.com/jobs/9");
   assert.equal(page.isPosting, true);
@@ -64,7 +64,7 @@ test("unrelated page: nothing captured, but the applied check still runs", async
     capturing: false,
   });
   await until(() => t.of("check").length, "check");
-  assert.deepEqual(t.of("shouldCapture")[0], { type: "shouldCapture", matched: false, url: "https://blog.example.com/post" });
+  assert.deepEqual(t.of("shouldCapture")[0], { type: "shouldCapture", matched: false, url: "https://blog.example.com/post", hasForm: false });
   assert.equal(t.of("page").length, 0);
 });
 

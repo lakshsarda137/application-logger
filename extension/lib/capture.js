@@ -275,12 +275,73 @@
     return (body ? (body.innerText ?? body.textContent ?? "") : "").slice(0, MAX_TEXT);
   }
 
-  /** Rules 1–3 from README §4.2. */
+  const APPLY_CONTROL = /^\s*(easy\s+)?apply(\s+(now|today|here|online|for\s+(this|the)\s+(job|position|role)))?\s*[›→>]?\s*$/i;
+
+  /** An "Apply" button or link (short control text, not "apply" inside a sentence). */
+  function hasApplyControl() {
+    for (const c of document.querySelectorAll("a, button, [role=button], input[type=submit], input[type=button]")) {
+      const label = clean(c.tagName === "INPUT" ? c.value : c.getAttribute("aria-label") || c.innerText || c.textContent);
+      if (label.length <= 40 && APPLY_CONTROL.test(label)) return true;
+    }
+    return false;
+  }
+
+  const FILLABLE = "input:not([type=hidden]):not([type=submit]):not([type=button]):not([type=reset]):not([type=image]):not([type=search]), textarea, select";
+  const NAME_FIELD = /\b(first|last|full|given|family|legal|preferred)[\s_-]?name\b|^name$/i;
+  const EMAIL_FIELD = /e-?mail/i;
+  const RESUME_WORD = /\b(r[eé]sum[eé]s?|cv|curriculum vitae)\b/i;
+  const UPLOAD_WORD = /\b(upload|attach|drop|choose file|select file)\b/i;
+
+  function fieldHay(el) {
+    return [ownLabel(el), el.name, el.id, el.getAttribute("autocomplete"), el.getAttribute("placeholder"), el.getAttribute("data-automation-id")]
+      .filter(Boolean)
+      .join(" ")
+      .replace(/([a-z])([A-Z])/g, "$1 $2")
+      .replace(/[_-]+/g, " ");
+  }
+
+  /**
+   * A job application form: it mentions a resume/CV, offers an upload, and
+   * asks for your name or email. Contact forms (name + email + message) don't
+   * mention a resume; plain uploads don't ask for your name.
+   */
+  function isApplicationForm(text = pageText()) {
+    const fields = [...document.querySelectorAll(FILLABLE)];
+    if (!fields.length) return false;
+    const hasFile = fields.some((f) => f.type === "file");
+    const hasResume = RESUME_WORD.test(text) || fields.some((f) => f.type === "file" && RESUME_WORD.test(fieldHay(f)));
+    const hasUpload = hasFile || UPLOAD_WORD.test(text);
+    const hasEmail = fields.some(
+      (f) => f.type === "email" || /^email$/i.test(f.getAttribute("autocomplete") || "") || EMAIL_FIELD.test(fieldHay(f)),
+    );
+    const hasName = fields.some(
+      (f) => /^(name|given-name|family-name)$/i.test(f.getAttribute("autocomplete") || "") || NAME_FIELD.test(fieldHay(f)),
+    );
+    return hasResume && hasUpload && (hasEmail || hasName);
+  }
+
+  /** At least two things to fill in (a search box alone doesn't count). Used for rule 4. */
+  function hasFillableForm() {
+    let n = 0;
+    for (const f of document.querySelectorAll(FILLABLE)) {
+      if (f.disabled || f.readOnly) continue;
+      if (/search/i.test(`${f.getAttribute("role") || ""} ${f.name} ${f.id} ${f.getAttribute("aria-label") || ""}`)) continue;
+      if (++n >= 2) return true;
+    }
+    return false;
+  }
+
+  /**
+   * README §4.2: ats (rule 1), keywords (rule 2: posting wording + a way to
+   * apply), jsonld (rule 3), form (an application form). `fillable` feeds rule 4.
+   */
   function signals(text = pageText(), jsonld = findJobPosting()) {
     return {
       ats: AL.isAtsPage ? AL.isAtsPage(location.hostname, location.pathname) : false,
       jsonld: Boolean(jsonld),
-      keywords: AL.matchesPostingKeywords ? AL.matchesPostingKeywords(text) : false,
+      keywords: AL.matchesPostingKeywords ? AL.matchesPostingKeywords(text, { hasApplyControl: hasApplyControl() }) : false,
+      form: isApplicationForm(text),
+      fillable: hasFillableForm(),
     };
   }
 
@@ -312,6 +373,9 @@
     fieldKey,
     fileFieldLabel,
     findJobPosting,
+    hasApplyControl,
+    hasFillableForm,
+    isApplicationForm,
     readFiles,
     signals,
     snapshot,

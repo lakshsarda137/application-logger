@@ -76,25 +76,24 @@ application-logger/
 ### 4.2 What gets cached
 - **Job posting pages:** on load (after the DOM settles), the extension saves the URL, title, visible text (`innerText`), full HTML, and structured data from any `schema.org/JobPosting` JSON-LD (title, company, location, employment type, salary, date posted, job ID).
 
-  A page is cached if **any** of these rules match:
+  A page is cached if **any** of these rules match (and it isn't on a personal site, see below):
 
-  1. **Known application site.** The hostname ends with one of:
-     `myworkdayjobs.com`, `myworkdaysite.com`, `workday.com`, `greenhouse.io`, `lever.co`, `ashbyhq.com`, `smartrecruiters.com`, `icims.com`, `jobvite.com`, `workable.com`, `bamboohr.com`, `taleo.net`, `successfactors.com`, `oraclecloud.com` (Oracle Recruiting), `eightfold.ai`, `rippling.com`, `breezy.hr`, `recruitee.com`, `jazzhr.com`, `applytojob.com`, `teamtailor.com`, `personio.com`, `dover.com`, `wellfound.com`, `handshake.com` / `joinhandshake.com`, `linkedin.com/jobs`, `indeed.com`.
-     The list lives in `extension/lib/ats-domains.js` so it's easy to extend.
+  1. **Job-application platform.** The hostname ends with one of the candidate-facing hosts in `extension/lib/ats-domains.js`: Workday job sites (`myworkdayjobs.com`, `myworkdaysite.com`), `greenhouse.io`, `lever.co`, `ashbyhq.com`, SmartRecruiters, iCIMS, Jobvite, Workable (`apply.`), BambooHR (`/careers`, `/jobs`), Taleo, SuccessFactors (`/career`), Oracle (`/hcmUI/CandidateExperience`), Eightfold, Rippling (`ats.`), Breezy, Recruitee, JazzHR, Teamtailor, Personio, Dover, Wellfound/Handshake/LinkedIn/Indeed job paths. Multi-purpose sites are narrowed to their job pages, so Workday's or Rippling's HR apps and your LinkedIn profile don't count.
 
-  2. **Keyword rule.** The page's visible text (case-insensitive, whole-word/phrase match) contains at least one phrase from **each** of these three groups:
+  2. **Job posting wording plus a way to apply.** The visible text has a phrase from both groups below, **and** the page has an "Apply" button or link (or an apply phrase such as "Apply for this job" or "Submit application"). Wording alone used to match blog posts and inboxes.
 
      | Group | Phrases (any one counts) |
      |---|---|
-     | **A: Qualifications** | qualifications, preferred qualifications, minimum qualifications, basic qualifications, nice to have, bonus points, who you are, skills |
+     | **A: Qualifications / role** | qualifications, preferred/minimum/basic qualifications, nice to have, bonus points, who you are, skills, responsibilities, what you'll do, about the role, job description |
      | **B: Requirements** | requirements, required, what you'll need, what we're looking for, must have, you have, you bring |
-     | **C: Role / posting signal** | responsibilities, what you'll do, about the role, the role, job description, apply now, apply for this job, submit application, equal opportunity employer |
 
-     All three groups must match. This avoids false positives like a blog post that happens to mention "requirements."
+  3. **Job-posting metadata.** The page contains `schema.org/JobPosting` JSON-LD. Only job postings have it.
 
-  3. **Job-posting metadata.** The page contains `schema.org/JobPosting` JSON-LD. Most company career pages include this, so it catches postings the keyword rule misses at no cost.
+  4. **An application form.** The page mentions a resume/CV, offers an upload, and asks for your name or email. Contact forms (no resume) and newsletter boxes (no upload) don't count.
 
-  4. **Active session.** The tab (or the tab that opened it) already has a capture session. This is what keeps pages P2…Pn of a multi-page application: those pages are just forms, so they wouldn't match rules 1–3 on their own if they're on a custom company domain.
+  5. **A later step of the same application.** The tab (or the tab that opened it) already has a capture session, the page is on the **same site** as a page that matched rules 1–4, and it has a form to fill in (two or more fields). This keeps pages P2…Pn of a custom-domain portal. It does not follow you to other sites, and LinkedIn/Indeed/Google never extend a session to the rest of their site.
+
+  **Never captured:** Gmail, Google Docs/Drive/Calendar/Meet/Chat, Outlook, Slack, WhatsApp, Instagram, Facebook, X, Reddit, YouTube, Claude, ChatGPT, Notion. Empty embedded frames (ads, trackers, captchas) are skipped. Uploads are still cached everywhere (see below).
 
   The phrase lists live in `extension/lib/posting-keywords.js`.
 - **Uploads:** a capture-phase listener catches `change` on `input[type=file]` and `drop` events. The file bytes, filename, MIME type, and nearby field label are stored. Uploading a new file into the same field replaces the old one.
@@ -303,7 +302,7 @@ None of this has been manually tested on a real portal yet (see the checklist be
 - **Posting page choice.** The dialog picks the latest page with JobPosting JSON-LD, else the latest keyword match, else the first page. Each captured page has a radio button to change this and a checkbox to leave it out.
 - **Classifier fallback.** Rule 4 of §5.1 labels only the first unmatched file as a cover letter. Any further unmatched files become "Other".
 - **Dashboard auth.** Dashboard pages set an HttpOnly, SameSite=Strict cookie (derived from the token, not the token itself). Mutating calls also need `X-Requested-With: dashboard`.
-- **Capture stays on the application's site.** Rule 4 (active session) only captures unmatched pages on the same site as a page that matched rules 1–3; LinkedIn/Indeed/Google never extend a session to the rest of their site. Personal sites (Gmail, Docs/Drive, Calendar, Meet, Outlook, Slack, Instagram, Facebook, X, Reddit, YouTube, Claude, ChatGPT, Notion) are never snapshotted, and empty embedded frames (ads, captchas) are skipped. Uploads are still cached everywhere. The "applied here" check only matches captured pages from the posting's site, an ATS, or the company's own domain.
+- **Capture is deliberately narrow** (§4.2): job platforms, posting wording plus an Apply button, JobPosting metadata, application forms, and later form steps on the same site. Personal sites are never captured. The "applied here" check only matches captured pages from the posting's site, a job platform, or the company's own domain.
 - **Copy numbers are stripped from resume/cover letter names.** `Resume(75).pdf`, `Resume (2).pdf` and `Resume copy 3.pdf` become `Resume.pdf`, both in what a job site receives and in the saved copy. The file on your disk is never touched. Only browser/macOS copy markers are removed (not `-1` or ` 2026`), and only for files that look like a resume or cover letter by filename or field label. The browser-side rename runs on job pages and covers normal and hidden upload fields; drag-and-drop uploads aren't renamed in the browser, but the saved copy is still clean.
 - **Clicking the extension icon** opens the dashboard. Options are under right-click → Options.
 

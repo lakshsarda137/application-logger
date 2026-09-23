@@ -146,13 +146,34 @@ def is_never_capture(url: str | None) -> bool:
     return any(host == d or host.endswith("." + d) for d in NEVER_CAPTURE)
 
 
+# Candidate-facing job hosts (and path prefixes); mirrors AppLogger.ATS_DOMAINS in
+# extension/lib/ats-domains.js. Narrower than ATS_PLATFORMS, which only labels
+# the platform: e.g. app.rippling.com is Rippling's HR app, not a job page.
+ATS_PAGES = (
+    "myworkdayjobs.com", "myworkdaysite.com", "greenhouse.io", "lever.co", "ashbyhq.com",
+    "jobs.smartrecruiters.com", "careers.smartrecruiters.com", "icims.com", "jobvite.com",
+    "apply.workable.com", "bamboohr.com/careers", "bamboohr.com/jobs", "taleo.net",
+    "successfactors.com/career", "successfactors.eu/career",
+    "oraclecloud.com/hcmUI/CandidateExperience", "eightfold.ai", "ats.rippling.com",
+    "breezy.hr", "recruitee.com", "applytojob.com", "jazzhr.com", "teamtailor.com",
+    "jobs.personio.com", "jobs.personio.de", "app.dover.com", "wellfound.com/jobs",
+    "joinhandshake.com/jobs", "joinhandshake.com/stu/jobs", "linkedin.com/jobs",
+    "indeed.com/viewjob", "indeed.com/jobs", "indeed.com/applystart", "smartapply.indeed.com",
+)
+
+
 def is_ats_page(url: str | None) -> bool:
-    """Like detect_ats, but LinkedIn only counts under /jobs (not profiles or the feed)."""
-    platform = detect_ats(url)
-    if platform != "linkedin":
-        return platform is not None
+    """A page on a job-application platform (not LinkedIn profiles, Workday's HR app, …)."""
+    host = _hostname(url)
     try:
-        path = urlsplit(url or "").path
+        path = urlsplit(url or "").path or "/"
     except ValueError:
         return False
-    return path == "/jobs" or path.startswith("/jobs/")
+    for entry in ATS_PAGES:
+        domain, _, prefix = entry.partition("/")
+        prefix = f"/{prefix}" if prefix else ""
+        if (host == domain or host.endswith("." + domain)) and (
+            not prefix or path == prefix or path.startswith(prefix + "/")
+        ):
+            return True
+    return False

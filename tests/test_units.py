@@ -174,6 +174,15 @@ def test_site_of():
     assert site_of("") == "" and site_of("not a url") == ""
 
 
+def test_is_ats_page_only_candidate_facing_parts():
+    assert is_ats_page("https://ats.rippling.com/acme/jobs/1")
+    assert not is_ats_page("https://app.rippling.com/dashboard")
+    assert not is_ats_page("https://www.workday.com/en-us/products.html")
+    assert is_ats_page("https://acme.wd5.myworkdayjobs.com/External/job/x")
+    assert is_ats_page("https://acme.fa.us2.oraclecloud.com/hcmUI/CandidateExperience/en/sites/x")
+    assert not is_ats_page("https://acme.fa.us2.oraclecloud.com/fscmUI/faces/FuseWelcome")
+
+
 def test_is_ats_page_is_path_aware_for_linkedin():
     assert is_ats_page("https://www.linkedin.com/jobs/view/1")
     assert not is_ats_page("https://www.linkedin.com/in/me/")

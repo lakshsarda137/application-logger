@@ -2,7 +2,7 @@
 // chrome.* calls (they come in through `deps`) so it can be tested in Node.
 //
 // Messages (all from content.js, sender.tab.id identifies the tab):
-//   shouldCapture {matched, url}            -> {capturing}
+//   shouldCapture {matched, url, hasForm}   -> {capturing}
 //   page          {snapshot, isPosting}     -> {ok}
 //   answers       {answers}                 -> {ok}
 //   upload        {fieldKey, fieldLabel, pageUrl, files: [{..., base64}]} -> {ok}
@@ -81,10 +81,11 @@ export async function handleMessage(msg, sender, deps) {
           const openerSession = opener == null ? null : await findSessionForTab(opener, now);
           if (openerSession) session = await ensureSession(tabId, { openerTabId: opener }, now);
         }
-        // Rule 4: an unmatched page is captured only on a site where a matched
-        // page of this session lives (e.g. careers.acme.com/apply/2).
+        // Rule 4: an unmatched page is captured only if it's a later step of the
+        // application: on a site where a matched page of this session lives
+        // (e.g. careers.acme.com/apply/2) AND it has a form to fill in.
         const onSessionSite = Boolean(site) && (session?.sites || []).includes(site);
-        return { capturing: Boolean(session && session.strong && onSessionSite) };
+        return { capturing: Boolean(session && session.strong && onSessionSite && msg.hasForm) };
       });
 
     case "page":
