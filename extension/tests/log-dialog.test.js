@@ -53,13 +53,15 @@ const okServer = (onPost, { labels } = {}) => async (method, path, init) => {
   return { status: 404, body: { detail: "nope" } };
 };
 
-async function openDialog(sessionId, server, { token = "tok", warn } = {}) {
-  const q = new URLSearchParams({ session: sessionId });
+async function openDialog(sessionId, server, { token = "tok", warn, url } = {}) {
+  const q = new URLSearchParams({ session: sessionId, tab: "77" });
   if (warn) q.set("warn", warn);
+  if (url) q.set("url", url);
   const dom = new JSDOM(HTML, { url: `chrome-extension://abc/log-dialog.html?${q}` });
   const { window } = dom;
   const requests = [];
   let closed = false;
+  const tabCalls = [];
   Object.assign(globalThis, {
     window,
     document: window.document,
@@ -68,6 +70,14 @@ async function openDialog(sessionId, server, { token = "tok", warn } = {}) {
     chrome: {
       storage: { local: { get: async (defaults) => ({ ...defaults, apiToken: token }) } },
       runtime: { openOptionsPage() {} },
+      tabs: {
+        update: async (id, props) => tabCalls.push(["update", id, props]),
+        getCurrent: async () => ({ id: 78 }),
+        remove: async (id) => {
+          tabCalls.push(["remove", id]);
+          closed = true;
+        },
+      },
     },
     fetch: async (url, init = {}) => {
       const path = new URL(url).pathname;
@@ -82,7 +92,7 @@ async function openDialog(sessionId, server, { token = "tok", warn } = {}) {
   };
   await import(`../log-dialog.js?load=${++loadCount}`);
   const $ = (id) => window.document.getElementById(id);
-  return { window, $, requests, isClosed: () => closed, all: (sel) => [...window.document.querySelectorAll(sel)] };
+  return { window, $, requests, tabCalls, isClosed: () => closed, all: (sel) => [...window.document.querySelectorAll(sel)] };
 }
 
 const submit = (d) => d.$("form").dispatchEvent(new d.window.Event("submit", { cancelable: true }));
@@ -126,7 +136,8 @@ test("save: payload uses the chosen posting page and included pages; session is 
   d.all("#answers button")[0].click();
 
   submit(d);
-  await until(() => !d.$("done").hidden, "done view");
+  await until(() => d.isClosed(), "tab closed after saving");
+  assert.deepEqual(d.tabCalls, [["update", 77, { active: true }], ["remove", 78]], "back to the job tab, dialog tab closed");
 
   const payload = JSON.parse(await posted.body.get("payload").text());
   assert.equal(payload.posting.url, "https://acme.wd5.myworkdayjobs.com/External/job/NYC/SWE_R1");
@@ -140,6 +151,17 @@ test("save: payload uses the chosen posting page and included pages; session is 
   assert.deepEqual(payload.form_answers.map((a) => a.field_label), ["Why Acme?"]);
   assert.deepEqual(await Promise.all(posted.body.getAll("files").map((f) => f.text())), ["resume-bytes", "letter-bytes"]);
   assert.equal(await getSessionData(s.id), null, "session deleted after saving");
+});
+
+test("the page being logged is the posting, even if an older one has JSON-LD", async () => {
+  const s = await ensureSession(nextTab++, { strong: true }, NOW);
+  const rippling = "https://ats.rippling.com/globex/jobs/2";
+  await putPage(s.id, { url: rippling, title: "Data Scientist - Globex", text: "x", isTop: true, isPosting: true, capturedAt: new Date(NOW - 60_000).toISOString() }, NOW);
+  await putPage(s.id, { url: "https://boards.greenhouse.io/acme/jobs/1", title: "SWE", text: "x", jsonld: { title: "Software Engineer", hiringOrganization: { name: "Acme" } }, isTop: true, isPosting: true, capturedAt: new Date(NOW - 1_000).toISOString() }, NOW);
+  const d = await openDialog(s.id, okServer(), { url: rippling });
+  await until(() => d.$("source").textContent, "prefill");
+  assert.equal(d.$("source").textContent, rippling);
+  assert.notEqual(d.$("company").value, "Acme");
 });
 
 test("choosing a different posting page re-guesses the details", async () => {

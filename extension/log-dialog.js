@@ -368,7 +368,8 @@ $("form").addEventListener("submit", async (e) => {
     await deleteSession(state.sessionId);
     $("form").hidden = true;
     $("done-path").textContent = result.folder_path;
-    $("done").hidden = false;
+    $("done").hidden = false; // only seen if the tab can't close itself
+    closeDialog();
   } catch (err) {
     if (err instanceof ApiError && err.status === 409 && err.detail?.code === "month_folder_missing") {
       state.month = { month: err.detail.month, path: err.detail.path, exists: false };
@@ -389,14 +390,27 @@ $("discard").addEventListener("click", () => {
   const no = el("button", { type: "button", className: "link", textContent: "Keep it" });
   yes.addEventListener("click", async () => {
     await deleteSession(state.sessionId);
-    window.close();
+    closeDialog();
   });
   no.addEventListener("click", () => $("discard-area").replaceChildren($("discard")));
   $("discard-area").replaceChildren(document.createTextNode("Delete everything captured for this tab? "), yes, " ", no);
 });
 
-$("cancel").addEventListener("click", () => window.close());
-$("close-done").addEventListener("click", () => window.close());
+$("cancel").addEventListener("click", () => closeDialog());
+$("close-done").addEventListener("click", () => closeDialog());
+
+/** The dialog is a tab next to the job page: switch back to that page and close. */
+async function closeDialog() {
+  const from = Number(params.get("tab"));
+  if (from) await chrome.tabs?.update(from, { active: true }).catch(() => {});
+  try {
+    const self = await chrome.tabs?.getCurrent();
+    if (self) return await chrome.tabs.remove(self.id);
+  } catch {
+    // Fall through.
+  }
+  window.close();
+}
 
 // ------------------------------------------------------------------ init
 
@@ -422,7 +436,7 @@ async function init() {
     return;
   }
 
-  const built = buildLogData(data);
+  const built = buildLogData(data, { loggedUrl: params.get("url") || "" });
   // Pages from well before the posting (e.g. a different job browsed earlier in
   // the same tab) start unticked; the posting and everything after are included.
   const postingAt = Date.parse(built.posting?.capturedAt) || 0;

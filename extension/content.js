@@ -73,7 +73,15 @@
     }
     const signals = AL.capture.signals();
     const matched = signals.ats || signals.jsonld || signals.keywords || signals.form;
-    const res = await send({ type: "shouldCapture", matched, url: location.href, hasForm: signals.fillable });
+    const isPosting = signals.jsonld || signals.keywords;
+    const res = await send({
+      type: "shouldCapture",
+      matched,
+      url: location.href,
+      hasForm: signals.fillable,
+      // Which job this is, so moving on to another job starts a new session.
+      posting: isTop && isPosting ? postingInfo() : undefined,
+    });
     state.capturing = Boolean(res && res.capturing);
     publishJobPage();
 
@@ -81,10 +89,16 @@
       const snap = await AL.capture.snapshot({ files: false });
       // Embedded frames with no text (ads, trackers, captchas) aren't pages worth keeping.
       const worthKeeping = isTop || snap.text.trim().length >= 20;
-      if (worthKeeping) await send({ type: "page", snapshot: snap, isPosting: signals.jsonld || signals.keywords });
+      if (worthKeeping) await send({ type: "page", snapshot: snap, isPosting });
       if (snap.answers.length) await send({ type: "answers", answers: snap.answers });
     }
     if (isTop) checkApplied();
+  }
+
+  function postingInfo() {
+    const job = AL.capture.findJobPosting();
+    const jsonld = job ? { title: job.title, identifier: job.identifier, hiringOrganization: job.hiringOrganization } : null;
+    return { url: location.href, title: document.title || "", jsonld };
   }
 
   function scheduleEvaluate() {

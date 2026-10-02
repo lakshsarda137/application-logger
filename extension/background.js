@@ -9,6 +9,7 @@
 
 import { api, getConnection } from "./lib/api.js";
 import { handleMessage, toStoredFiles, withTabLock } from "./lib/messages.js";
+import { postingIdentity } from "./lib/postings.js";
 import { siteOf } from "./lib/sites.js";
 import {
   clearAllTabLinks,
@@ -143,12 +144,26 @@ async function logApplication(tab) {
     errors.push(`Could not read the page: ${e.message}`);
   }
 
+  // If the page being logged is a job posting, the session must be that job's
+  // (not an earlier job browsed in this tab or the tab that opened it).
+  const top = frames.find((f) => f.isTop);
+  const loggedUrl = top?.url || tab.url || "";
+  const posting =
+    top && (top.signals.jsonld || top.signals.keywords)
+      ? postingIdentity({ url: top.url, title: top.title, jsonld: top.jsonld })
+      : null;
+
   const session = await withTabLock(tab.id, async () => {
-    const s = await ensureSession(tab.id, { strong: true, openerTabId: tab.openerTabId ?? null, site: siteOf(tab.url) });
+    const s = await ensureSession(tab.id, {
+      strong: true,
+      openerTabId: tab.openerTabId ?? null,
+      site: siteOf(tab.url),
+      posting,
+    });
     for (const f of frames) {
       if (/^https?:/i.test(f.url) && !isNeverCapture(f.url)) {
-        const posting = f.signals.jsonld || f.signals.keywords;
-        if (f.isTop || f.text.trim().length >= 20) await putPage(s.id, { ...f, isPosting: posting });
+        const isPosting = f.signals.jsonld || f.signals.keywords;
+        if (f.isTop || f.text.trim().length >= 20) await putPage(s.id, { ...f, isPosting });
       }
       if (f.answers.length) await putAnswers(s.id, f.answers);
       for (const group of f.files) {
@@ -161,12 +176,14 @@ async function logApplication(tab) {
     return s;
   });
 
-  const params = new URLSearchParams({ session: session.id });
+  // A tab right next to the job page (same window); it closes itself after saving
+  // and switches back to `tab`.
+  const params = new URLSearchParams({ session: session.id, tab: String(tab.id), url: loggedUrl });
   if (errors.length) params.set("warn", errors.join(" "));
-  await chrome.windows.create({
+  await chrome.tabs.create({
     url: chrome.runtime.getURL(`log-dialog.html?${params}`),
-    type: "popup",
-    width: 640,
-    height: 860,
+    windowId: tab.windowId,
+    index: tab.index + 1,
+    openerTabId: tab.id,
   });
 }

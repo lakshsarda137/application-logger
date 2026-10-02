@@ -4,7 +4,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 
 import { handleMessage, withTabLock } from "../lib/messages.js";
-import { findSessionForTab, getSessionData } from "../lib/sessions.js";
+import { findSessionForTab, getSession, getSessionData, linkTab } from "../lib/sessions.js";
 
 let nextTab = 5000;
 const b64 = (s) => Buffer.from(s).toString("base64");
@@ -178,4 +178,54 @@ test("withTabLock keeps running after a failure", async () => {
   await assert.rejects(a);
   await b;
   assert.deepEqual(order, ["a", "b"]);
+});
+
+// ---------------------------------------------------------------- one session per posting
+
+const posting = (url, title, company) => ({ url, title: "", jsonld: { title, hiringOrganization: { name: company } } });
+const matchedPosting = (tab, p, d) =>
+  handleMessage({ type: "shouldCapture", matched: true, url: p.url, hasForm: true, posting: p }, from(tab), d);
+
+test("moving on to another posting in the same tab starts a new session; going back resumes the old one", async () => {
+  const tab = nextTab++;
+  const d = deps();
+  const x = posting("https://boards.greenhouse.io/acme/jobs/1", "Software Engineer", "Acme");
+  const y = posting("https://ats.rippling.com/globex/jobs/2", "Data Scientist", "Globex");
+
+  await matchedPosting(tab, x, d);
+  await handleMessage({ type: "page", snapshot: snap(x.url, { jsonld: x.jsonld }), isPosting: true }, from(tab), d);
+  const sx = await findSessionForTab(tab);
+
+  await matchedPosting(tab, y, d);
+  await handleMessage({ type: "page", snapshot: snap(y.url), isPosting: true }, from(tab), d);
+  const sy = await findSessionForTab(tab);
+  assert.notEqual(sy.id, sx.id);
+  assert.deepEqual((await getSessionData(sy.id)).pages.map((p) => p.url), [y.url], "Y's log doesn't show X");
+  assert.deepEqual((await getSessionData(sx.id)).pages.map((p) => p.url), [x.url], "X's capture is kept");
+
+  // An apply step of Y stays in Y's session.
+  await handleMessage({ type: "shouldCapture", matched: true, url: `${y.url}/apply`, hasForm: true }, from(tab), d);
+  assert.equal((await findSessionForTab(tab)).id, sy.id);
+
+  await matchedPosting(tab, x, d);
+  assert.equal((await findSessionForTab(tab)).id, sx.id, "back to X resumes X's session");
+});
+
+test("a posting opened from a search tab gets its own session; the same job on its ATS joins", async () => {
+  const search = nextTab++;
+  const other = nextTab++;
+  const same = nextTab++;
+  const d = deps({ openers: { [other]: search, [same]: search } });
+  const listing = posting("https://www.linkedin.com/jobs/search/?currentJobId=1", "Software Engineer", "Acme");
+  await matchedPosting(search, listing, d);
+  const s = await findSessionForTab(search);
+
+  await linkTab(other, search); // what tabs.onCreated does
+  await matchedPosting(other, posting("https://jobs.lever.co/globex/9", "Data Scientist", "Globex"), d);
+  assert.notEqual((await findSessionForTab(other)).id, s.id);
+  assert.ok(!(await getSession(s.id)).tabIds.includes(other), "left the search tab's session");
+
+  await linkTab(same, search);
+  await matchedPosting(same, posting("https://boards.greenhouse.io/acme/jobs/55", "Software Engineer", "Acme"), d);
+  assert.equal((await findSessionForTab(same)).id, s.id);
 });

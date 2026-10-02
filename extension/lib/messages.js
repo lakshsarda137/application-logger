@@ -2,13 +2,15 @@
 // chrome.* calls (they come in through `deps`) so it can be tested in Node.
 //
 // Messages (all from content.js, sender.tab.id identifies the tab):
-//   shouldCapture {matched, url, hasForm}   -> {capturing}
+//   shouldCapture {matched, url, hasForm, posting?: {url, title, jsonld}} -> {capturing}
+//                 (posting: only from a top frame that is a job posting)
 //   page          {snapshot, isPosting}     -> {ok}
 //   answers       {answers}                 -> {ok}
 //   upload        {fieldKey, fieldLabel, pageUrl, files: [{..., base64}]} -> {ok}
 //   check         {url, jobId, company}     -> server's /applications/check result, or null
 //   openApplication {id}                    -> opens the dashboard page
 
+import { postingIdentity } from "./postings.js";
 import { BROAD_SITES, siteOf } from "./sites.js";
 import {
   ensureSession,
@@ -71,7 +73,16 @@ export async function handleMessage(msg, sender, deps) {
         const site = siteOf(msg.url || sender?.url || "");
         if (msg.matched) {
           const extendTo = BROAD_SITES.has(site) ? "" : site;
-          await ensureSession(tabId, { strong: true, openerTabId: await deps.openerOf(tabId), site: extendTo }, now);
+          const p = msg.posting;
+          const posting =
+            p && typeof p.url === "string" && isHttp(p.url)
+              ? postingIdentity({
+                  url: p.url,
+                  title: String(p.title || ""),
+                  jsonld: p.jsonld && typeof p.jsonld === "object" ? p.jsonld : null,
+                })
+              : null;
+          await ensureSession(tabId, { strong: true, openerTabId: await deps.openerOf(tabId), site: extendTo, posting }, now);
           return { capturing: true };
         }
         let session = await findSessionForTab(tabId, now);

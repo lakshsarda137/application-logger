@@ -69,6 +69,7 @@ application-logger/
 - The background worker keeps a **capture session per tab**. It holds page snapshots, uploaded files, and form answers.
 - If a tab opens a new tab (e.g. "Apply" on a company site opens Workday), the new tab **joins the opener's session** (`openerTabId`). This keeps the posting and the application together.
 - Navigating across domains within the same tab stays in the same session.
+- **One session per job posting.** When a tab (or a tab opened from it) lands on a posting for a *different* job, it starts a new session instead, so browsing several postings in one tab, or opening several from a search page, never mixes them. The old session keeps its data, and returning to that posting resumes it. Two postings count as the same job if they share a job ID (and company), if one URL is a later step of the other (`/jobs/1` → `/jobs/1/apply`), or if the company and job title match (the careers page and its ATS). Anything else counts as a different job (`extension/lib/postings.js`).
 - Sessions expire **24 hours** after their last activity and are then deleted.
 - Cached data is **not** considered "applied." Only logged applications count.
 - Cached data lives only in the extension's IndexedDB. Nothing is sent to the server until you log.
@@ -299,7 +300,8 @@ None of this has been manually tested on a real portal yet (see the checklist be
 - **Uploads are cached on every site**, not only on job pages, so a file is never lost. An upload alone doesn't make a tab start capturing pages; only rules 1–3 (or logging) do.
 - **Detached file inputs.** Some widgets pick files through an `<input type=file>` that is never added to the page. `lib/main-world-hook.js` (a MAIN-world content script) catches those too.
 - **"Other recent uploads".** The log dialog also lists files uploaded in *other* tabs in the last 24h (e.g. if the Workday tab was closed), so they can be added.
-- **Posting page choice.** The dialog picks the latest page with JobPosting JSON-LD, else the latest keyword match, else the first page. Each captured page has a radio button to change this and a checkbox to leave it out.
+- **Posting page choice.** The dialog picks the page you logged from if it's a posting, else the latest posting page (JSON-LD or keyword match), else the first page. A posting page without JSON-LD gives way to the same posting's JSON-LD page (an earlier step of its URL, or an embedded frame). An older posting never wins over a newer one. Each captured page has a radio button to change this and a checkbox to leave it out.
+- **The log dialog opens as a tab** next to the page, in the same window. It closes after saving (or Cancel/Discard) and switches back to the page.
 - **Classifier fallback.** Rule 4 of §5.1 labels only the first unmatched file as a cover letter. Any further unmatched files become "Other".
 - **Dashboard auth.** Dashboard pages set an HttpOnly, SameSite=Strict cookie (derived from the token, not the token itself). Mutating calls also need `X-Requested-With: dashboard`.
 - **Capture is deliberately narrow** (§4.2): job platforms, posting wording plus an Apply button, JobPosting metadata, application forms, and later form steps on the same site. Personal sites are never captured. The "applied here" check only matches captured pages from the posting's site, a job platform, or the company's own domain.
@@ -316,7 +318,8 @@ npm install && npm test                                 # extension (Node 20+, j
 1. Run `./scripts/start.sh`. In the extension's Options, paste the token from `config.local.json` and click **Test connection**.
 2. **Greenhouse/Lever (one page):** open a posting, fill the form, attach a resume and cover letter, then right-click → **Log entire application**. Check the prefilled details, the file labels (the server classifier relabels them after a moment), the answers and the pages. Save, then confirm `{base}/{Month}/{folder}` contains only the resume and cover letter.
 3. **Workday (multi-page):** open a posting, click Apply, and upload your resume on the upload step. Continue a few steps, then log from the last page. The resume and the posting page should both appear even though they're no longer on screen.
-4. **New tab:** on a company careers page whose "Apply" opens the ATS in a new tab, apply there and log. The posting from the first tab should be included.
+4. **New tab:** on a company careers page whose "Apply" opens the ATS in a new tab, apply there and log. The posting from the first tab should be included (if the ATS page shows the posting again, it is included only when its company and title match).
+4b. **Several postings:** in one tab, open posting X, then posting Y (different job), and log from Y. Only Y's pages should appear. Do the same with two postings opened from a LinkedIn search tab.
 5. **Closed tab:** upload a file in some tab, close it, then log from another tab. The file should be under **Other recent uploads**.
 6. **Server down:** stop the server and log. The dialog should say "Server not running", and after restarting the server, **Retry** should save with nothing lost.
 7. **Toast:** revisit a logged posting (also try it with `?utm_source=x` added). "You applied here on {date}" should appear top-right, and clicking it opens the dashboard.

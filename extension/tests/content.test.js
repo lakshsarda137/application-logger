@@ -50,7 +50,17 @@ const POSTING = `<html><head><title>SWE at Acme</title>
 test("posting page: asks to capture, sends a snapshot, checks 'applied here'", async () => {
   const t = start(POSTING, { url: "https://careers.acme.com/jobs/9" });
   await until(() => t.of("check").length, "check");
-  assert.deepEqual(t.of("shouldCapture")[0], { type: "shouldCapture", matched: true, url: "https://careers.acme.com/jobs/9", hasForm: true });
+  assert.deepEqual(t.of("shouldCapture")[0], {
+    type: "shouldCapture",
+    matched: true,
+    url: "https://careers.acme.com/jobs/9",
+    hasForm: true,
+    posting: {
+      url: "https://careers.acme.com/jobs/9",
+      title: "SWE at Acme",
+      jsonld: { title: "SWE", identifier: { value: "R9" }, hiringOrganization: { name: "Acme" } },
+    },
+  });
   const page = t.of("page")[0];
   assert.equal(page.snapshot.url, "https://careers.acme.com/jobs/9");
   assert.equal(page.isPosting, true);

@@ -12,8 +12,12 @@
 // in the same tab isn't captured. An upload on an unrelated site still gets
 // cached (in a weak session) so it's never lost, but it doesn't start
 // snapshotting that tab.
+//
+// A session is also for one job posting (`posting`, lib/postings.js): a tab
+// that lands on a different job leaves its session for that job's own.
 
 import { ANSWERS, PAGES, req, SESSIONS, transact, UPLOADS } from "./idb.js";
+import { samePosting } from "./postings.js";
 
 export const SESSION_TTL_MS = 24 * 60 * 60 * 1000;
 export const MAX_PAGES_PER_SESSION = 200;
@@ -42,20 +46,46 @@ export function getSession(sessionId) {
   return transact(SESSIONS, "readonly", (st) => req(st[SESSIONS].get(sessionId)));
 }
 
+// The session is for another job than `posting` (lib/postings.js).
+const otherPosting = (s, posting) => Boolean(s && posting && s.posting && !samePosting(s.posting, posting));
+
+async function activeForPosting(stores, posting, now) {
+  if (!posting) return null;
+  const list = await req(stores[SESSIONS].getAll());
+  return (
+    list
+      .filter((s) => isActive(s, now) && s.posting && samePosting(s.posting, posting))
+      .sort((a, b) => b.lastActivity - a.lastActivity)[0] || null
+  );
+}
+
 /**
  * The tab's active session, else its opener's (the tab joins it), else a new one.
  * `strong: true` upgrades the session; it never downgrades.
+ *
+ * `posting` (a postingIdentity, given when the top frame is a job posting)
+ * keeps one session per job: if the tab's or opener's session is for a
+ * different job, the tab leaves it (its data stays, for that job) and joins the
+ * session already holding this job, or a new one.
  */
-export function ensureSession(tabId, { strong = false, openerTabId = null, site = "" } = {}, now = Date.now()) {
+export function ensureSession(tabId, { strong = false, openerTabId = null, site = "", posting = null } = {}, now = Date.now()) {
   return transact(SESSIONS, "readwrite", async (st) => {
     let s = await activeForTab(st, tabId, now);
+    if (otherPosting(s, posting)) {
+      s.tabIds = s.tabIds.filter((t) => t !== tabId);
+      await req(st[SESSIONS].put(s));
+      s = null;
+    }
     if (!s && openerTabId != null && openerTabId !== tabId) {
       s = await activeForTab(st, openerTabId, now);
-      if (s) s.tabIds = [...new Set([...s.tabIds, tabId])];
+      if (otherPosting(s, posting)) s = null;
     }
+    if (!s) s = await activeForPosting(st, posting, now);
     if (!s) {
-      s = { id: crypto.randomUUID(), tabIds: [tabId], createdAt: now, lastActivity: now, strong: false, sites: [] };
+      s = { id: crypto.randomUUID(), tabIds: [], createdAt: now, lastActivity: now, strong: false, sites: [] };
     }
+    s.tabIds = [...new Set([...s.tabIds, tabId])];
+    if (posting && !s.posting) s.posting = posting;
     s.lastActivity = now;
     if (strong) s.strong = true;
     // Sites of pages that matched rules 1–3; rule 4 only extends to these.
