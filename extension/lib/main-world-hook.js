@@ -20,7 +20,7 @@
   const proto = HTMLInputElement.prototype;
   const watched = new WeakSet();
 
-  const COPY_SUFFIX = /(?:\s*\(\d+\)|\s+copy(?:\s+\d+)?)$/i;
+  const COPY_SUFFIX = /(?:\s*\(\d+\)|\s+copy(?:\s+\d+)?|_+\d+_+|[._\s]tex)$/i;
   const RESUME_OR_COVER = /r[eé]sum[eé]|(^|[^a-z])cv([^a-z]|$)|cover/i;
 
   function cleanFilename(name) {

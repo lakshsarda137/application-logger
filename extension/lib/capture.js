@@ -95,9 +95,10 @@
   }
 
   // Copy numbers browsers and macOS add to duplicates: "Resume(75)", "Resume (2)",
-  // "Resume copy 3". Not "-1" or " 2026", which can be part of a real name.
+  // "Resume copy 3", the mangled form some sites save them as ("Resume_tex__18_")
+  // and a leftover LaTeX "_tex". Not "-1" or " 2026", which can be part of a real name.
   // Same rule as server/storage.py strip_copy_suffix and lib/guess.js.
-  const COPY_SUFFIX = /(?:\s*\(\d+\)|\s+copy(?:\s+\d+)?)$/i;
+  const COPY_SUFFIX = /(?:\s*\(\d+\)|\s+copy(?:\s+\d+)?|_+\d+_+|[._\s]tex)$/i;
   function cleanFilename(name) {
     const dot = name.lastIndexOf(".");
     const ext = dot > 0 ? name.slice(dot) : "";

@@ -56,9 +56,10 @@ def sanitize_filename(name: str) -> str:
 
 
 # Copy numbers browsers and macOS add to duplicates: "Resume(75)", "Resume (2)",
-# "Resume copy", "Resume copy 3". Deliberately not "-1" or " 2026": those can
-# be part of a real name.
-_COPY_SUFFIX = re.compile(r"(?:\s*\(\d+\)|\s+copy(?:\s+\d+)?)$", re.IGNORECASE)
+# "Resume copy", "Resume copy 3", plus the mangled form some sites save them as
+# ("Resume.tex (18)" -> "Resume_tex__18_") and a leftover LaTeX ".tex"/"_tex".
+# Deliberately not "-1" or " 2026": those can be part of a real name.
+_COPY_SUFFIX = re.compile(r"(?:\s*\(\d+\)|\s+copy(?:\s+\d+)?|_+\d+_+|[._\s]tex)$", re.IGNORECASE)
 
 
 def strip_copy_suffix(filename: str) -> str:

@@ -54,6 +54,12 @@ export const COPY_CASES = [
   ["Copywriter Resume.pdf", "Copywriter Resume.pdf"],
   ["(75).pdf", "(75).pdf"],
   ["Resume(3)", "Resume"],
+  ["Ada_Lovelace_Resume_tex__18_ (6).pdf", "Ada_Lovelace_Resume.pdf"],
+  ["Ada_Lovelace_Resume_General_tex_18_ (49).pdf", "Ada_Lovelace_Resume_General.pdf"],
+  ["Ada_Lovelace_Resume.tex (18).pdf", "Ada_Lovelace_Resume.pdf"],
+  ["Ada_Lovelace_Resume_v2.pdf", "Ada_Lovelace_Resume_v2.pdf"],
+  ["Ada_Lovelace_Resume_2026.pdf", "Ada_Lovelace_Resume_2026.pdf"],
+  ["Ada_Lovelace_Resume_LaTeX.pdf", "Ada_Lovelace_Resume_LaTeX.pdf"],
 ];
 
 export async function until(fn, what = "condition", timeoutMs = 3000) {

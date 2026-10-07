@@ -191,7 +191,7 @@ export function defaultKind(filename, fieldLabel = "", taken = []) {
 
 // Copy numbers browsers and macOS add to duplicates. Same rule as
 // lib/capture.js and server/storage.py strip_copy_suffix.
-const COPY_SUFFIX = /(?:\s*\(\d+\)|\s+copy(?:\s+\d+)?)$/i;
+const COPY_SUFFIX = /(?:\s*\(\d+\)|\s+copy(?:\s+\d+)?|_+\d+_+|[._\s]tex)$/i;
 
 /** "Resume(75).pdf" -> "Resume.pdf"; "Resume copy 2.pdf" -> "Resume.pdf". */
 export function cleanFilename(name) {
