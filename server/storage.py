@@ -76,6 +76,19 @@ def strip_copy_suffix(filename: str) -> str:
     return f"{cleaned}{dot}{ext}" if cleaned else filename
 
 
+def saved_filename(filename: str, kind: str, resume_name: str = "") -> str:
+    """The name a resume/cover letter is saved under.
+
+    A resume becomes "<resume_name>.<ext>" when resume_name is set; otherwise
+    (and for cover letters) only copy numbers are stripped.
+    """
+    if kind == "resume" and resume_name:
+        _, dot, ext = filename.rpartition(".")
+        fixed = sanitize_filename(resume_name)
+        return f"{fixed}.{ext}" if dot and ext else fixed
+    return strip_copy_suffix(filename)
+
+
 def folder_candidates(name: str, now: datetime):
     """`name`, then `name_YYYY-MM-DD`, then `name_YYYY-MM-DD_HHMM`, then numbered."""
     date = now.strftime("%Y-%m-%d")

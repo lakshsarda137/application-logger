@@ -4,5 +4,6 @@
   "db_path": "~/Library/Application Support/ApplicationLogger/app.db",
   "host": "127.0.0.1",
   "port": 8765,
-  "extension_id": ""
+  "extension_id": "",
+  "resume_name": ""
 }

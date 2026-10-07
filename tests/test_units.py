@@ -109,6 +109,13 @@ def test_strip_copy_suffix(raw, expected):
     assert storage.strip_copy_suffix(raw) == expected
 
 
+def test_saved_filename_uses_resume_name_for_resumes_only():
+    assert storage.saved_filename("Resume_tex__18_ (6).pdf", "resume", "Ada_Lovelace_Resume") == "Ada_Lovelace_Resume.pdf"
+    assert storage.saved_filename("cv.docx", "resume", "Ada_Lovelace_Resume") == "Ada_Lovelace_Resume.docx"
+    assert storage.saved_filename("Cover (2).pdf", "cover_letter", "Ada_Lovelace_Resume") == "Cover.pdf"
+    assert storage.saved_filename("Resume (2).pdf", "resume", "") == "Resume.pdf"
+
+
 def test_create_unique_folder_collision_sequence(tmp_path):
     names = [storage.create_unique_folder(tmp_path, "google_swe", NOW).name for _ in range(4)]
     assert names == [

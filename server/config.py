@@ -25,6 +25,10 @@ DEFAULTS = {
     # Optional: pin CORS to one extension ID (chrome://extensions shows it).
     # Empty means any chrome-extension:// origin; the token still applies.
     "extension_id": "",
+    # Optional: every resume is uploaded and saved as "<resume_name>.<ext>",
+    # whatever the file on disk is called. Empty keeps the original name
+    # (minus copy numbers).
+    "resume_name": "",
 }
 
 # Values in config.example.json that mean "generate one for me".
@@ -40,6 +44,7 @@ class Config:
     port: int
     extension_id: str
     path: Path
+    resume_name: str = ""
 
 
 def _expand(p: str) -> Path:
@@ -82,4 +87,5 @@ def load_config(path: Path | None = None) -> Config:
         port=int(merged["port"]),
         extension_id=str(merged.get("extension_id") or ""),
         path=path,
+        resume_name=str(merged.get("resume_name") or "").strip(),
     )

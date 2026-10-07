@@ -230,7 +230,11 @@ def create_app(config: Config | None = None) -> FastAPI:
 
     @app.get("/settings", dependencies=auth)
     def get_settings(conn: sqlite3.Connection = Depends(get_conn)) -> dict:
-        return {"base_path": str(base_path(conn)), "month_folder": month_info(conn)}
+        return {
+            "base_path": str(base_path(conn)),
+            "month_folder": month_info(conn),
+            "resume_name": config.resume_name,
+        }
 
     @app.put("/settings", dependencies=auth)
     def put_settings(body: SettingsIn, conn: sqlite3.Connection = Depends(get_conn)) -> dict:
@@ -367,8 +371,9 @@ def create_app(config: Config | None = None) -> FastAPI:
             filename = storage.sanitize_filename(doc.filename)
             file_path = None
             if doc.kind in WRITTEN_KINDS:
-                # The copy on disk stays "Resume(75).pdf"; the saved one is "Resume.pdf".
-                filename = storage.strip_copy_suffix(filename)
+                # The copy on disk stays "Resume(75).pdf"; the saved one is "Resume.pdf"
+                # (or "<resume_name>.pdf" for a resume, when configured).
+                filename = storage.saved_filename(filename, doc.kind, config.resume_name)
                 file_path = str(storage.write_file(folder, filename, content))
             conn.execute(
                 "INSERT INTO documents (application_id, kind, filename, file_path, mime, sha256,"

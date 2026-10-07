@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import dataclasses
 import hashlib
 import sqlite3
 from datetime import datetime
@@ -316,3 +317,20 @@ def test_copy_numbers_are_stripped_from_saved_resume_and_cover_letter(client, co
     assert sorted(p.name for p in folder.iterdir()) == ["Ada_Lovelace_Cover_Letter.pdf", "Ada_Lovelace_Resume.pdf"]
     names = [d["filename"] for d in query(config, "SELECT filename FROM documents ORDER BY id")]
     assert names == ["Ada_Lovelace_Resume.pdf", "Ada_Lovelace_Cover_Letter.pdf", "transcript (3).pdf"]
+
+
+def test_resume_is_saved_under_configured_resume_name(config, month_dir):
+    config = dataclasses.replace(config, resume_name="Ada_Lovelace_Resume")
+    client = TestClient(create_app(config), base_url="http://127.0.0.1:8765", headers={"X-API-Token": TOKEN})
+    assert client.get("/settings").json()["resume_name"] == "Ada_Lovelace_Resume"
+    payload = full_payload(documents=[
+        {"kind": "resume", "filename": "Ada_Lovelace_Resume_General_tex_18_ (49).pdf", "mime": "application/pdf"},
+        {"kind": "cover_letter", "filename": "Ada_Lovelace_Cover_Letter (2).pdf", "mime": "application/pdf"},
+    ])
+    r = client.post("/applications", files=multipart(payload, [
+        ("Ada_Lovelace_Resume_General_tex_18_ (49).pdf", RESUME, "application/pdf"),
+        ("Ada_Lovelace_Cover_Letter (2).pdf", COVER, "application/pdf"),
+    ]))
+    assert r.status_code == 201, r.text
+    folder = Path(r.json()["folder_path"])
+    assert sorted(p.name for p in folder.iterdir()) == ["Ada_Lovelace_Cover_Letter.pdf", "Ada_Lovelace_Resume.pdf"]
