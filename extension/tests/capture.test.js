@@ -192,4 +192,11 @@ test("capture.cleanFilename matches the shared table; isResumeOrCover checks nam
   assert.equal(AL.capture.isResumeOrCover("Ada (2).pdf", "Resume/CV"), true);
   assert.equal(AL.capture.isResumeOrCover("photo (2).png", "Profile photo"), false);
   assert.equal(AL.capture.isResumeOrCover("cvs-receipt (2).pdf", ""), false);
+  const n = "Ada_Lovelace_Resume";
+  assert.equal(AL.capture.uploadName("Ada_Lovelace_Resume_General_tex_18_ (49).pdf", "", n), "Ada_Lovelace_Resume.pdf");
+  assert.equal(AL.capture.uploadName("draft.docx", "Resume/CV", n), "Ada_Lovelace_Resume.docx");
+  assert.equal(AL.capture.uploadName("Cover Letter (2).pdf", "Resume/CV", n), "Cover Letter.pdf");
+  assert.equal(AL.capture.uploadName("draft.pdf", "Resume or cover letter", n), "draft.pdf");
+  assert.equal(AL.capture.uploadName("photo (2).png", "Profile photo", n), "photo (2).png");
+  assert.equal(AL.capture.uploadName("Ada_Resume (2).pdf", "", ""), "Ada_Resume.pdf");
 });

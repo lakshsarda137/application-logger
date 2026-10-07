@@ -10,6 +10,7 @@ import {
   folderName,
   guessCompanyAndPosition,
   parseTitle,
+  savedFilename,
   shortPosition,
 } from "../lib/guess.js";
 
@@ -148,4 +149,11 @@ test("guess for the Rippling flow: posting page title, company from the URL", ()
 
 test("cleanFilename strips browser/macOS copy numbers only", () => {
   for (const [raw, expected] of COPY_CASES) assert.equal(cleanFilename(raw), expected, raw);
+});
+
+test("savedFilename: a resume takes the configured name, others lose copy numbers", () => {
+  assert.equal(savedFilename("Resume_General_tex_18_ (49).pdf", "resume", "Ada_Lovelace_Resume"), "Ada_Lovelace_Resume.pdf");
+  assert.equal(savedFilename("Cover (2).pdf", "cover_letter", "Ada_Lovelace_Resume"), "Cover.pdf");
+  assert.equal(savedFilename("transcript (3).pdf", "other", "Ada_Lovelace_Resume"), "transcript (3).pdf");
+  assert.equal(savedFilename("Resume (2).pdf", "resume", ""), "Resume.pdf");
 });

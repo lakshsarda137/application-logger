@@ -14,7 +14,7 @@ afterEach(() => {
   while (open.length) open.pop().window.close();
 });
 
-function start(html, { url, capturing = true, applied = null, hook = false, config = {} } = {}) {
+function start(html, { url, capturing = true, applied = null, hook = false, config = {}, storage = {} } = {}) {
   const dom = makePage(html, { url, config: { ...FAST, ...config } });
   open.push(dom);
   const sent = [];
@@ -27,6 +27,10 @@ function start(html, { url, capturing = true, applied = null, hook = false, conf
         if (msg.type === "check") return applied ? { applied: true, application: applied } : { applied: false };
         return { ok: true };
       },
+    },
+    storage: {
+      local: { get: async (defaults) => ({ ...defaults, ...storage }) },
+      onChanged: { addListener() {} },
     },
   };
   installDataTransfer(dom.window);
@@ -295,6 +299,44 @@ test("detached inputs on job pages are renamed by the page-world hook", async ()
   assert.equal(seenBySite, "Ada_Lovelace_Resume.pdf");
   await until(() => t.of("upload").length, "upload");
   assert.equal(t.of("upload")[0].files[0].filename, "Ada_Lovelace_Resume.pdf");
+});
+
+// ---------------------------------------------------------------- fixed resume name
+
+const RESUME_NAME = { resumeName: "Ada_Lovelace_Resume" };
+const APPLY_FORM = `<body><label for="cv">Resume/CV</label><input type="file" id="cv">
+  <label for="cl">Cover Letter</label><input type="file" id="cl"></body>`;
+
+test("with a resume name set, any resume reaches the site under that name", async () => {
+  const t = start(APPLY_FORM, { url: "https://jobs.lever.co/acme/1/apply", storage: RESUME_NAME });
+  await until(() => t.doc.documentElement.getAttribute("data-app-logger-resume-name"), "name published");
+  assert.equal((await pick(t, "cv", "Ada_Lovelace_Resume_General_tex_18_ (49).pdf")).files[0].name, "Ada_Lovelace_Resume.pdf");
+  assert.equal((await pick(t, "cv", "final draft.pdf")).files[0].name, "Ada_Lovelace_Resume.pdf", "by field label");
+  assert.equal((await pick(t, "cl", "Ada_Cover_Letter (2).pdf")).files[0].name, "Ada_Cover_Letter.pdf");
+  assert.equal((await pick(t, "cv", "Ada_Cover_Letter.pdf")).files[0].name, "Ada_Cover_Letter.pdf", "a cover letter stays one");
+});
+
+test("detached resume inputs get the resume name too", async () => {
+  const t = start(`<body></body>`, { url: "https://jobs.lever.co/acme/1/apply", hook: true, storage: RESUME_NAME });
+  await until(() => t.doc.documentElement.getAttribute("data-app-logger-resume-name"), "name published");
+  const input = t.doc.createElement("input");
+  input.type = "file";
+  input.setAttribute("aria-label", "Resume");
+  let seenBySite = null;
+  input.addEventListener("change", () => (seenBySite = input.files[0].name));
+  input.click();
+  attachFile(t.window, input, "Ada_Lovelace_Resume_tex__18_ (6).pdf", "d");
+  input.dispatchEvent(new t.window.Event("input"));
+  input.dispatchEvent(new t.window.Event("change"));
+  assert.equal(seenBySite, "Ada_Lovelace_Resume.pdf");
+  await until(() => t.of("upload").length, "upload");
+});
+
+test("the resume name isn't published off job pages", async () => {
+  const t = start(APPLY_FORM, { url: "https://drive.example.com/upload", capturing: false, storage: RESUME_NAME });
+  await until(() => t.of("check").length, "evaluated");
+  assert.equal(t.doc.documentElement.hasAttribute("data-app-logger-resume-name"), false);
+  assert.equal((await pick(t, "cv", "Ada (2).pdf")).files[0].name, "Ada (2).pdf");
 });
 
 test("never-capture sites (Gmail, Docs, …) send no pages or answers, but uploads are still cached", async () => {

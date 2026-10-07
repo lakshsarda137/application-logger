@@ -117,16 +117,40 @@
   // ---------------------------------------------------------------- clean upload names
   //
   // On job pages, a resume/cover letter picked as "Resume(75).pdf" reaches the
-  // site as "Resume.pdf". The file on disk is untouched: this swaps the File in
+  // site as "Resume.pdf" (a resume as "<resumeName>.pdf" when set). The file on disk is untouched: this swaps the File in
   // the input for a renamed copy (no re-read) during the "input" event, which
   // fires before "change" and before the site's own handlers read the file.
 
   const onJobPage = () => state.capturing || AL.isAtsPage(location.hostname, location.pathname);
 
+  // config.local.json resume_name, cached in storage by the service worker: every
+  // resume reaches the site as "<resumeName>.pdf", whatever it's called on disk.
+  let resumeName = "";
+  try {
+    chrome.storage.local.get({ resumeName: "" }).then((v) => {
+      resumeName = v.resumeName || "";
+      publishJobPage();
+    }, () => {});
+    chrome.storage.onChanged.addListener((changes) => {
+      if (!changes.resumeName) return;
+      resumeName = changes.resumeName.newValue || "";
+      publishJobPage();
+    });
+  } catch (e) {
+    // No storage (orphaned copy): only copy numbers are stripped.
+  }
+
   // Tell lib/main-world-hook.js (page world) so it can do the same for detached inputs.
   function publishJobPage() {
-    if (onJobPage()) document.documentElement.setAttribute("data-app-logger-job-page", "1");
-    else document.documentElement.removeAttribute("data-app-logger-job-page");
+    const root = document.documentElement;
+    if (onJobPage()) {
+      root.setAttribute("data-app-logger-job-page", "1");
+      if (resumeName) root.setAttribute("data-app-logger-resume-name", resumeName);
+      else root.removeAttribute("data-app-logger-resume-name");
+    } else {
+      root.removeAttribute("data-app-logger-job-page");
+      root.removeAttribute("data-app-logger-resume-name");
+    }
   }
 
   function cleanUploadNames(input) {
@@ -135,8 +159,8 @@
     const dt = new DataTransfer();
     let changed = false;
     for (const f of input.files) {
-      const clean = AL.capture.cleanFilename(f.name);
-      if (clean !== f.name && AL.capture.isResumeOrCover(f.name, label)) {
+      const clean = AL.capture.uploadName(f.name, label, resumeName);
+      if (clean !== f.name) {
         dt.items.add(new File([f], clean, { type: f.type, lastModified: f.lastModified }));
         changed = true;
       } else {

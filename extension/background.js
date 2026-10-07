@@ -46,6 +46,7 @@ chrome.runtime.onInstalled.addListener(() => {
   });
   chrome.alarms.create("prune", { periodInMinutes: 30 });
   prune();
+  refreshResumeName();
   injectIntoOpenTabs();
 });
 
@@ -66,11 +67,26 @@ async function injectIntoOpenTabs() {
 chrome.runtime.onStartup.addListener(async () => {
   await clearAllTabLinks().catch((e) => console.warn("[app-logger] clear links failed", e));
   prune();
+  refreshResumeName();
 });
 
 chrome.alarms.onAlarm.addListener((alarm) => {
-  if (alarm.name === "prune") prune();
+  if (alarm.name === "prune") {
+    prune();
+    refreshResumeName();
+  }
 });
+
+// config.local.json resume_name, cached for content scripts and the log dialog
+// (they rename every resume to it). Keeps the last value while the server is down.
+async function refreshResumeName() {
+  try {
+    const settings = await api("/settings");
+    await chrome.storage.local.set({ resumeName: settings.resume_name || "" });
+  } catch (e) {
+    // Server not running or no token yet; try again on the next alarm.
+  }
+}
 
 function prune() {
   pruneExpired().catch((e) => console.warn("[app-logger] prune failed", e));

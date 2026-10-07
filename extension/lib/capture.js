@@ -115,6 +115,32 @@
     return RESUME_OR_COVER.test(filename || "") || RESUME_OR_COVER.test(fieldLabel || "");
   }
 
+  // A resume by name ("Resume_v3.pdf", "Ada CV.pdf") or by field label
+  // ("Resume/CV"), but never a file or field that says cover letter.
+  const RESUME = /r[eé]sum[eé]|(^|[^a-z])cv([^a-z]|$)/i;
+  const COVER = /cover/i;
+  function isResume(filename, fieldLabel) {
+    const name = filename || "";
+    const label = fieldLabel || "";
+    if (COVER.test(name)) return false;
+    return RESUME.test(name) || (RESUME.test(label) && !COVER.test(label));
+  }
+
+  /**
+   * The name a picked file should reach the site with: a resume becomes
+   * "<resumeName>.<ext>" when the user set one (config.local.json resume_name);
+   * other resumes and cover letters lose copy numbers; anything else is kept.
+   * Same rule as lib/guess.js savedName, server/storage.py saved_filename and
+   * lib/main-world-hook.js.
+   */
+  function uploadName(filename, fieldLabel, resumeName) {
+    if (resumeName && isResume(filename, fieldLabel)) {
+      const dot = filename.lastIndexOf(".");
+      return resumeName + (dot > 0 ? filename.slice(dot) : "");
+    }
+    return isResumeOrCover(filename, fieldLabel) ? cleanFilename(filename) : filename;
+  }
+
   function fieldId(el) {
     return el.name || el.id || el.getAttribute("data-automation-id") || "";
   }
@@ -369,6 +395,8 @@
     answerFor,
     cleanFilename,
     isResumeOrCover,
+    isResume,
+    uploadName,
     collectAnswers,
     dropTarget,
     fieldKey,

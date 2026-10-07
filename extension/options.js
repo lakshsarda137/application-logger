@@ -29,6 +29,7 @@ async function save() {
 async function test() {
   try {
     const settings = await api("/settings");
+    await chrome.storage.local.set({ resumeName: settings.resume_name || "" });
     const m = settings.month_folder;
     status(
       `Connected. Saving to ${m.path}${m.exists ? "" : ` (the ${m.month} folder doesn't exist yet)`}.`,

@@ -1,5 +1,5 @@
 import { api, ApiError, getConnection, ServerDownError } from "./lib/api.js";
-import { cleanFilename, defaultKind, folderName, guessCompanyAndPosition } from "./lib/guess.js";
+import { defaultKind, folderName, guessCompanyAndPosition, savedFilename } from "./lib/guess.js";
 import { buildLogData, fileKey } from "./lib/logdata.js";
 import { deleteSession, getSessionData, recentUploads } from "./lib/sessions.js";
 
@@ -23,6 +23,7 @@ const state = {
   useCustomDir: false,
   folderEdited: false,
   saving: false,
+  resumeName: "", // config.local.json resume_name, cached by the service worker
 };
 
 const el = (tag, props = {}, ...children) => {
@@ -160,8 +161,9 @@ function hostOf(url) {
   }
 }
 
-// Resume and cover letter are saved without copy numbers ("Resume(75).pdf" -> "Resume.pdf").
-const savedName = (file) => (file.kind === "other" ? file.filename : cleanFilename(file.filename));
+// Resume and cover letter are saved without copy numbers ("Resume(75).pdf" -> "Resume.pdf"),
+// and a resume as "<resume_name>.pdf" when that's configured.
+const savedName = (file) => savedFilename(file.filename, file.kind, state.resumeName);
 
 function renderFiles() {
   $("no-files").hidden = state.files.length > 0;
@@ -448,6 +450,7 @@ async function init() {
   state.answers = built.answers;
   for (const u of built.files) addFile({ ...u, source: "page" });
   state.recent = await recentUploads({ excludeSessionId: state.sessionId });
+  state.resumeName = (await chrome.storage.local.get({ resumeName: "" })).resumeName || "";
 
   applyGuess();
   renderFiles();

@@ -204,3 +204,16 @@ export function cleanFilename(name) {
   }
   return stem ? stem + ext : name;
 }
+
+/**
+ * The name a logged file is saved under: a resume becomes "<resumeName>.<ext>"
+ * when set (config.local.json resume_name), a cover letter loses copy numbers,
+ * anything else is kept. Same rule as server/storage.py saved_filename.
+ */
+export function savedFilename(filename, kind, resumeName = "") {
+  if (kind === "resume" && resumeName) {
+    const dot = filename.lastIndexOf(".");
+    return resumeName + (dot > 0 ? filename.slice(dot) : "");
+  }
+  return kind === "other" ? filename : cleanFilename(filename);
+}

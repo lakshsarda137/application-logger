@@ -8,8 +8,8 @@
 //
 // On job pages (content.js sets data-app-logger-job-page on <html>) it also
 // strips copy numbers from resume/cover letter names ("Resume(75).pdf" ->
-// "Resume.pdf") before the page reads the file, like content.js does for
-// ordinary inputs. The rename rules repeat lib/capture.js's: this file runs in
+// "Resume.pdf"), and renames a resume to data-app-logger-resume-name when
+// set, before the page reads the file, like content.js does for ordinary inputs. The rename rules repeat lib/capture.js's: this file runs in
 // the page's world and can't share code with it.
 
 (() => {
@@ -22,6 +22,8 @@
 
   const COPY_SUFFIX = /(?:\s*\(\d+\)|\s+copy(?:\s+\d+)?|_+\d+_+|[._\s]tex)$/i;
   const RESUME_OR_COVER = /r[eé]sum[eé]|(^|[^a-z])cv([^a-z]|$)|cover/i;
+  const RESUME = /r[eé]sum[eé]|(^|[^a-z])cv([^a-z]|$)/i;
+  const COVER = /cover/i;
 
   function cleanFilename(name) {
     const dot = name.lastIndexOf(".");
@@ -34,15 +36,29 @@
     return stem ? stem + ext : name;
   }
 
+  function isResume(name, label) {
+    if (COVER.test(name)) return false;
+    return RESUME.test(name) || (RESUME.test(label) && !COVER.test(label));
+  }
+
+  function uploadName(name, label, resumeName) {
+    if (resumeName && isResume(name, label)) {
+      const dot = name.lastIndexOf(".");
+      return resumeName + (dot > 0 ? name.slice(dot) : "");
+    }
+    return RESUME_OR_COVER.test(name) || RESUME_OR_COVER.test(label) ? cleanFilename(name) : name;
+  }
+
   function cleanNames(input) {
     if (document.documentElement.getAttribute("data-app-logger-job-page") !== "1") return;
     if (!input.files || !input.files.length) return;
     const label = input.getAttribute("aria-label") || input.name || "";
+    const resumeName = document.documentElement.getAttribute("data-app-logger-resume-name") || "";
     const dt = new DataTransfer();
     let changed = false;
     for (const f of input.files) {
-      const clean = cleanFilename(f.name);
-      if (clean !== f.name && (RESUME_OR_COVER.test(f.name) || RESUME_OR_COVER.test(label))) {
+      const clean = uploadName(f.name, label, resumeName);
+      if (clean !== f.name) {
         dt.items.add(new File([f], clean, { type: f.type, lastModified: f.lastModified }));
         changed = true;
       } else {
